@@ -1,0 +1,62 @@
+// fig0_comparison.dot
+// Side-by-side strip: A | B | C evaluation configurations at a glance.
+// Render: dot -Tpng -Gdpi=140 fig0_comparison.dot -o fig0_comparison.png
+
+digraph STRIP {
+  graph [fontname="DejaVu Sans", rankdir=TB,
+         label="DRDS-NPU evaluation configurations at a glance",
+         labelloc=b, fontsize=14, pad=0.2];
+
+  node [shape=plaintext, fontname="DejaVu Sans"];
+  edge [style=invis];
+
+  strip [label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="10" CELLPADDING="10">
+
+      <TR>
+        <TD BGCOLOR="#FFFFFF">
+          <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="2" CELLPADDING="7">
+            <TR><TD COLSPAN="4" BGCOLOR="#DAE8FC"><FONT POINT-SIZE="10"><B>Region A</B> — WS pinned</FONT></TD><TD BORDER="1" BGCOLOR="#FFCCCC"> </TD><TD COLSPAN="4" BGCOLOR="#D5E8D4"><FONT POINT-SIZE="10"><B>Region B</B> — WS pinned</FONT></TD></TR>
+            <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD><TD BGCOLOR="#FFCCCC"> </TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
+            <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD><TD BGCOLOR="#FFCCCC"> </TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
+            <TR><TD COLSPAN="9" BGCOLOR="#FFFFFF"><FONT POINT-SIZE="9">split + concurrent · both muxes forced to PIN_DFLOW</FONT></TD></TR>
+          </TABLE>
+        </TD>
+
+        <TD BGCOLOR="#FFFFFF">
+          <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="2" CELLPADDING="7">
+            <TR><TD COLSPAN="9" BGCOLOR="#DAE8FC"><FONT POINT-SIZE="10"><B>Tenant</B> — full span cols 0–15</FONT></TD></TR>
+            <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
+            <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
+            <TR><TD COLSPAN="9" BGCOLOR="#FFFFFF"><FONT POINT-SIZE="9">unsplit · serial: P[WS] ⇒ Q[OS] ⇒ P[WS] ⇒ …</FONT></TD></TR>
+          </TABLE>
+        </TD>
+
+        <TD BGCOLOR="#FFFFF3">
+          <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="2" CELLPADDING="7" COLOR="#B8A000">
+            <TR><TD COLSPAN="4" BGCOLOR="#DAE8FC"><FONT POINT-SIZE="10"><B>Region A</B> — WS</FONT></TD><TD BORDER="1" BGCOLOR="#FFCCCC"> </TD><TD COLSPAN="4" BGCOLOR="#D5E8D4"><FONT POINT-SIZE="10"><B>Region B</B> — OS</FONT></TD></TR>
+            <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD><TD BGCOLOR="#FFCCCC"> </TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
+            <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD><TD BGCOLOR="#FFCCCC"> </TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
+            <TR><TD COLSPAN="9" BGCOLOR="#FFFFF3"><FONT POINT-SIZE="9"><B>split + concurrent · each mux free per tile</B></FONT></TD></TR>
+          </TABLE>
+        </TD>
+      </TR>
+
+      <TR>
+        <TD ALIGN="TEXT">
+          <FONT POINT-SIZE="11"><B>A — Homogeneous-dataflow fission</B></FONT><BR/>
+          <FONT POINT-SIZE="9">fission only · per-region switching removed<BR ALIGN="LEFT"/>(captures homogeneous-dataflow constraint)<BR ALIGN="LEFT"/></FONT>
+        </TD>
+        <TD ALIGN="TEXT">
+          <FONT POINT-SIZE="11"><B>B — Sequential dataflow switching</B></FONT><BR/>
+          <FONT POINT-SIZE="9">switching only · concurrency removed<BR ALIGN="LEFT"/>(captures single-tenant constraint)<BR ALIGN="LEFT"/></FONT>
+        </TD>
+        <TD BGCOLOR="#FFFFF3" ALIGN="TEXT">
+          <FONT POINT-SIZE="11"><B>C — Heterogeneous fission (novel)</B></FONT><BR/>
+          <FONT POINT-SIZE="9">= fission + per-region dataflow selection<BR ALIGN="LEFT"/>both ideas composed<BR ALIGN="LEFT"/></FONT>
+        </TD>
+      </TR>
+
+    </TABLE>
+  >];
+}

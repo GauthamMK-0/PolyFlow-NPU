@@ -1,0 +1,47 @@
+// figB_seq_switch.dot
+// Config B — Sequential dataflow switching (baseline): whole-array tenant, one tile at a time.
+// Render: scripts/render_figures.sh
+
+digraph CFG_B {
+  graph [fontname="DejaVu Sans", rankdir=TB, compound=true,
+         label="Config B — Sequential dataflow switching\lfull array, one tile at a time, dataflow free per tile\l(SINGLE_TENANT=1)\l",
+         labelloc=b, fontsize=13, pad=0.25];
+
+  node  [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=11,
+         fillcolor="#F5F5F5", color="#666666", margin="0.16,0.09"];
+  edge  [fontname="DejaVu Sans", fontsize=10, color="#444444"];
+
+  host [label="Host / Scheduler\n(one tile at a time)", fillcolor="#EFEFEF"];
+
+  tl [shape=box, style="filled", fillcolor="#FFFDE7", color="#B8A000", fontsize=11,
+      label="timeline:   P-tile [WS]  ⇒  Q-tile [OS]  ⇒  P-tile [WS]  ⇒  …\lthe two streams never overlap\l"];
+  host -> tl;
+
+  regF [label=<
+    <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#6C8EBF">
+      <TR><TD COLSPAN="4" BGCOLOR="#DAE8FC"><B>Tenant</B> · full array, cols 0–15</TD></TR>
+      <TR><TD COLSPAN="4">Dataflow: <B>free per tile</B> — WS ⇄ OS ⇄ IS</TD></TR>
+      <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
+      <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
+    </TABLE>>, fillcolor="#FFFFFF"];
+
+  tl -> regF [label="next tile"];
+
+  safety [label="OTP token + scrub\n(per bank)", fillcolor="#FFF4F0", color="#C0392B"];
+  regF -> safety [dir=both, label="token"];
+
+  subgraph cluster_banks {
+    label=" "; style="rounded"; color="#CCCCCC";
+    b0 [label="bank",           fillcolor="#FFE6CC", color="#D79B00", fontsize=10];
+    b1 [label="bank",           fillcolor="#FFE6CC", color="#D79B00", fontsize=10];
+    b2 [label="bank",           fillcolor="#FFE6CC", color="#D79B00", fontsize=10];
+    b3 [label="bank",           fillcolor="#FFE6CC", color="#D79B00", fontsize=10];
+  }
+
+  regF -> b1 [dir=back, label="in", weight=2];
+  regF -> b2 [label="out", weight=2];
+
+  eppa [label="EPPA arbiter\n(lane B parked)", fillcolor="#E8EAF6", color="#3949AB"];
+  regF -> eppa [label="phase"];
+  eppa -> b0 [lhead=cluster_banks, label="bw"];
+}

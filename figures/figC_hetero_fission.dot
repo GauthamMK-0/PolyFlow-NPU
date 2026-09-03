@@ -1,0 +1,74 @@
+// figC_hetero_fission.dot
+// Config C — Heterogeneous fission (novel): fission + per-region dataflow selection.
+// Render: scripts/render_figures.sh
+
+digraph CFG_C {
+  graph [fontname="DejaVu Sans", rankdir=TB, compound=true,
+         label="Config C — Heterogeneous fission (novel)\lsplit array, concurrent regions, each picks its own dataflow\l(FORCE_DATAFLOW_EN=0 · SINGLE_TENANT=0)\l",
+         labelloc=b, fontsize=13, pad=0.25];
+
+  node  [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=11,
+         fillcolor="#F5F5F5", color="#666666", margin="0.16,0.09"];
+  edge  [fontname="DejaVu Sans", fontsize=10, color="#444444"];
+
+  host [label="Host / Scheduler", fillcolor="#EFEFEF"];
+
+  dec [label="Fission Decoder\n(splits the array)", fillcolor="#EDE7F6", color="#7E57C2"];
+  host -> dec [label="split"];
+
+  regA [label=<
+    <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#6C8EBF">
+      <TR><TD COLSPAN="4" BGCOLOR="#DAE8FC"><B>Region A</B> · cols 0–7</TD></TR>
+      <TR><TD COLSPAN="4">Dataflow: <B>WS</B> — weights held, CNN-style</TD></TR>
+      <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
+      <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
+    </TABLE>>, fillcolor="#FFFFFF"];
+
+  gate [shape=rectangle, style="filled,dashed", fillcolor="#FFCCCC", color="#CC0000",
+        label="gate", fontsize=9, width=0.30];
+
+  regB [label=<
+    <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#82B366">
+      <TR><TD COLSPAN="4" BGCOLOR="#D5E8D4"><B>Region B</B> · cols 8–15</TD></TR>
+      <TR><TD COLSPAN="4">Dataflow: <B>OS</B> — streams Q·K, attention-style</TD></TR>
+      <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
+      <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
+    </TABLE>>, fillcolor="#FFFFFF"];
+
+  {rank=same; regA; gate; regB;}
+  regA -> gate [style=invis];
+  gate -> regB [style=invis];
+
+  dec -> regA [label="region 0"];
+  dec -> regB [label="region 1"];
+
+  safety [label="OTP token + scrub\n(per bank)", fillcolor="#FFF4F0", color="#C0392B"];
+  regA -> safety [dir=both, label="token"];
+  regB -> safety [dir=both];
+
+  subgraph cluster_banksA {
+    label=" "; style="rounded"; color="#CCCCCC";
+    b0 [label="outputs A", fillcolor="#FFE6CC", color="#D79B00", fontsize=10];
+    b1 [label="weights A", fillcolor="#FFE6CC", color="#D79B00", fontsize=10];
+  }
+  subgraph cluster_banksB {
+    label=" "; style="rounded"; color="#CCCCCC";
+    b2 [label="stream B", fillcolor="#FFE6CC", color="#D79B00", fontsize=10];
+    b3 [label="idle",     fillcolor="#FFE6CC", color="#D79B00", fontsize=10];
+  }
+
+  regA -> b1 [dir=back, label="w", weight=2];
+  regA -> b0 [label="out", weight=2];
+  regB -> b2 [dir=back, label="Q·K", penwidth=2, color="#2E7D32", weight=2];
+
+  eppa [label="EPPA arbiter\n(bandwidth per phase)", fillcolor="#E8EAF6", color="#3949AB"];
+  regA -> eppa [label="phase"];
+  regB -> eppa;
+  eppa -> b1 [lhead=cluster_banksA, label="bw"];
+  eppa -> b2 [lhead=cluster_banksB];
+
+  note [shape=note, fillcolor="#FFF9DB", color="#B8A000", fontsize=10,
+        label="when A computes (idle on memory),\nits bandwidth share flows to streaming B"];
+  note -> eppa [style=dashed, arrowhead=none, color="#B8A000"];
+  {rank=same; note; eppa; safety;}
+}

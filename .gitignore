@@ -1,0 +1,11 @@
+# Build and simulation artifacts
+*.vvp
+*.vcd
+*.log
+obj_dir/
+*.o
+*.d
+*.a
+dump.vcd
+tb/dumps/
+scratch/

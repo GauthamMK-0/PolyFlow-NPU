@@ -1,0 +1,70 @@
+// figA_homo_fission.dot
+// Config A — Homogeneous-dataflow fission (baseline).
+// Render: scripts/render_figures.sh
+
+digraph CFG_A {
+  graph [fontname="DejaVu Sans", rankdir=TB, compound=true,
+         label="Config A — Homogeneous-dataflow fission\lsplit array, concurrent regions, all pinned to WS\l(FORCE_DATAFLOW_EN=1 · PIN_DFLOW=WS)\l",
+         labelloc=b, fontsize=13, pad=0.25];
+
+  node  [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=11,
+         fillcolor="#F5F5F5", color="#666666", margin="0.16,0.09"];
+  edge  [fontname="DejaVu Sans", fontsize=10, color="#444444"];
+
+  host [label="Host / Scheduler", fillcolor="#EFEFEF"];
+
+  dec [label="Fission Decoder\n(splits the array)", fillcolor="#EDE7F6", color="#7E57C2"];
+  host -> dec [label="split"];
+
+  regA [label=<
+    <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#6C8EBF">
+      <TR><TD COLSPAN="4" BGCOLOR="#DAE8FC"><B>Region A</B> · cols 0–7</TD></TR>
+      <TR><TD COLSPAN="4">Dataflow: <B>WS</B>  <FONT COLOR="#CC0000">(pinned)</FONT></TD></TR>
+      <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
+      <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
+    </TABLE>>, fillcolor="#FFFFFF"];
+
+  gate [shape=rectangle, style="filled,dashed", fillcolor="#FFCCCC", color="#CC0000",
+        label="gate", fontsize=9, width=0.30];
+
+  regB [label=<
+    <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#82B366">
+      <TR><TD COLSPAN="4" BGCOLOR="#D5E8D4"><B>Region B</B> · cols 8–15</TD></TR>
+      <TR><TD COLSPAN="4">Dataflow: <B>WS</B>  <FONT COLOR="#CC0000">(pinned)</FONT></TD></TR>
+      <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
+      <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
+    </TABLE>>, fillcolor="#FFFFFF"];
+
+  {rank=same; regA; gate; regB;}
+  regA -> gate [style=invis];
+  gate -> regB [style=invis];
+
+  dec -> regA [label="region 0"];
+  dec -> regB [label="region 1"];
+
+  safety [label="OTP token + scrub\n(per bank)", fillcolor="#FFF4F0", color="#C0392B"];
+  regA -> safety [dir=both, label="token"];
+  regB -> safety [dir=both];
+
+  subgraph cluster_banksA {
+    label=" "; style="rounded"; color="#CCCCCC";
+    b0 [label="weights A",  fillcolor="#FFE6CC", color="#D79B00", fontsize=10];
+    b1 [label="inputs A",   fillcolor="#FFE6CC", color="#D79B00", fontsize=10];
+    b2 [label="outputs A",  fillcolor="#FFE6CC", color="#D79B00", fontsize=10];
+  }
+  subgraph cluster_banksB {
+    label=" "; style="rounded"; color="#CCCCCC";
+    b3 [label="weights B", fillcolor="#FFE6CC", color="#D79B00", fontsize=10];
+  }
+
+  regA -> b0 [dir=back, weight=2];
+  regA -> b1 [dir=back, label="in", weight=2];
+  regA -> b2 [label="out", weight=2];
+  regB -> b3 [dir=back, weight=2];
+
+  eppa [label="EPPA arbiter\n(bandwidth per phase)", fillcolor="#E8EAF6", color="#3949AB"];
+  regA -> eppa [label="phase"];
+  regB -> eppa;
+  eppa -> b0 [lhead=cluster_banksA, label="bw"];
+  eppa -> b3 [lhead=cluster_banksB];
+}
