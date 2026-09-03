@@ -56,7 +56,9 @@ module sfa_top #(
 );
 
     wire [NUM_COLS-1:0] region_reassign_bus;
+    /* verilator lint_off UNUSEDSIGNAL */
     wire [NUM_COLS-1:0] pe_bank_role_stale;
+    /* verilator lint_on UNUSEDSIGNAL */
     logic [NUM_COLS-1:0] pe_bank_role_clear;
 
     // Fission Decoder
@@ -89,9 +91,13 @@ module sfa_top #(
         wire clr_wire;
         wire [NUM_REGIONS-1:0] req_bank     = {token_req_B[b], token_req_A[b]};
         wire [NUM_REGIONS-1:0] rel_bank     = {token_release_B[b], token_release_A[b]};
+        /* verilator lint_off UNUSEDSIGNAL */
         wire [REGION_W-1:0]    token_owner;
         wire                   token_held;
         wire [NUM_REGIONS-1:0] grant;
+        wire [REGION_W-1:0]    reg_owner;
+        wire [1:0]             role_tag_wire;
+        /* verilator lint_on UNUSEDSIGNAL */
 
         sfa_otp_fsm #(
             .NUM_REGIONS(NUM_REGIONS),
@@ -117,8 +123,8 @@ module sfa_top #(
             .new_role       (new_role_per_bank[2*b +: 2]),
             .scrub_active   (scrub_wire),
             .bank_role_clear(clr_wire),
-            .region_owner   (),
-            .role_tag       ()
+            .region_owner   (reg_owner),
+            .role_tag       (role_tag_wire)
         );
 
         assign scrub_active_bus[b]    = scrub_wire;

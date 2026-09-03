@@ -20,8 +20,10 @@ module dfs_top_tb;
 
     logic [NUM_COLS*DATA_W-1:0]         din_n;
     logic [NUM_ROWS*DATA_W-1:0]         din_w;
+    /* verilator lint_off UNUSEDSIGNAL */
     wire  [NUM_COLS*DATA_W-1:0]         dout_s;
     wire  [NUM_ROWS*DATA_W-1:0]         dout_e;
+    /* verilator lint_on UNUSEDSIGNAL */
     wire  [NUM_ROWS*NUM_COLS*ACC_W-1:0] acc_out_flat;
 
     int error_count = 0;
@@ -61,9 +63,9 @@ module dfs_top_tb;
         .acc_out_flat     (acc_out_flat)
     );
 
-    // Clock generator (100 MHz)
+    // Clock generator (100 MHz) with non-blocking assignment
     initial clk = 0;
-    always #5 clk = ~clk;
+    always #5 clk <= ~clk;
 
     task automatic step_clk();
         @(posedge clk);

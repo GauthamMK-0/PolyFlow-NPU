@@ -21,7 +21,9 @@ module sfa_pe #(
     output logic [ACC_W-1:0]        acc_out,
 
     // Region assignment & security flags
+    /* verilator lint_off UNUSEDSIGNAL */
     input  logic [REGION_W-1:0]     region_id,
+    /* verilator lint_on UNUSEDSIGNAL */
     input  logic                    region_reassign,
     output logic                    bank_role_stale,
     input  logic                    bank_role_clear,

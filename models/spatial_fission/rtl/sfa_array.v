@@ -38,10 +38,12 @@ module sfa_array #(
     input  logic [1:0]                          compute_en
 );
 
+    /* verilator lint_off UNOPTFLAT */
     wire [DATA_W-1:0] mesh_n [NUM_ROWS-1:0][NUM_COLS-1:0];
     wire [DATA_W-1:0] mesh_w [NUM_ROWS-1:0][NUM_COLS-1:0];
     wire [DATA_W-1:0] mesh_s [NUM_ROWS-1:0][NUM_COLS-1:0];
     wire [DATA_W-1:0] mesh_e [NUM_ROWS-1:0][NUM_COLS-1:0];
+    /* verilator lint_on UNOPTFLAT */
 
     // North inputs: Row 0 from external din_n; row r from row r-1
     for (genvar c = 0; c < NUM_COLS; c++) begin : gen_north_in
@@ -71,7 +73,9 @@ module sfa_array #(
     for (genvar r = 0; r < NUM_ROWS; r++) begin : gen_pe_row
         for (genvar c = 0; c < NUM_COLS; c++) begin : gen_pe_col
             wire [ACC_W-1:0] pe_acc;
+            /* verilator lint_off UNUSEDSIGNAL */
             wire             pe_stale;
+            /* verilator lint_on UNUSEDSIGNAL */
             wire             reg_id = region_id_mask[c];
 
             sfa_pe #(

@@ -31,10 +31,12 @@ module dfs_array #(
 );
 
     // Internal mesh wiring
+    /* verilator lint_off UNOPTFLAT */
     wire [DATA_W-1:0] mesh_n [NUM_ROWS-1:0][NUM_COLS-1:0];
     wire [DATA_W-1:0] mesh_w [NUM_ROWS-1:0][NUM_COLS-1:0];
     wire [DATA_W-1:0] mesh_s [NUM_ROWS-1:0][NUM_COLS-1:0];
     wire [DATA_W-1:0] mesh_e [NUM_ROWS-1:0][NUM_COLS-1:0];
+    /* verilator lint_on UNOPTFLAT */
 
     // North inputs: Row 0 from external din_n; row r from row r-1
     for (genvar c = 0; c < NUM_COLS; c++) begin : gen_north_in

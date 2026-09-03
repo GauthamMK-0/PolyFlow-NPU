@@ -36,14 +36,18 @@ module sfa_top_tb;
     logic [NUM_ROWS*DATA_W-1:0]         din_w_region_a;
     logic [NUM_ROWS*DATA_W-1:0]         din_w_region_b;
 
+    /* verilator lint_off UNUSEDSIGNAL */
     wire  [NUM_COLS*DATA_W-1:0]         dout_s;
     wire  [NUM_ROWS*DATA_W-1:0]         dout_e;
+    wire  [NUM_REGIONS-1:0]             reconfig_urgent;
+    /* verilator lint_on UNUSEDSIGNAL */
     wire  [NUM_ROWS*NUM_COLS*ACC_W-1:0] acc_out_flat;
     wire  [NUM_REGIONS*BW_W-1:0]        bw_alloc;
-    wire  [NUM_REGIONS-1:0]             reconfig_urgent;
     wire  [NUM_COLS-1:0]                region_id_mask;
+    /* verilator lint_off UNUSEDSIGNAL */
     wire  [NUM_BANKS-1:0]               scrub_active_bus;
     wire  [NUM_BANKS-1:0]               bank_role_clear_bus;
+    /* verilator lint_on UNUSEDSIGNAL */
 
     int error_count = 0;
 
@@ -101,7 +105,7 @@ module sfa_top_tb;
     );
 
     initial clk = 0;
-    always #5 clk = ~clk;
+    always #5 clk <= ~clk;
 
     task automatic step_clk();
         @(posedge clk);

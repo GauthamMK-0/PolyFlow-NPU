@@ -49,8 +49,10 @@ module sfa_otp_fsm #(
         found     = 1'b0;
         candidate = '0;
         for (int k = 0; k < NUM_REGIONS; k++) begin
+            int unsigned sum_idx;
             logic [REGION_W-1:0] idx;
-            idx = (priority_base + k[REGION_W-1:0]) % NUM_REGIONS;
+            sum_idx = int'(priority_base) + k;
+            idx     = REGION_W'(sum_idx % NUM_REGIONS);
             if (!found && token_req[idx]) begin
                 candidate = idx;
                 found     = 1'b1;
@@ -101,7 +103,7 @@ module sfa_otp_fsm #(
             token_held  <= 1'b0;
             grant       <= '0;
         end else begin
-            grant <= grant_pulse ? (1'b1 << candidate) : '0;
+            grant <= grant_pulse ? (NUM_REGIONS'(1'b1) << candidate) : '0;
 
             case (next_state)
                 S_FREE: begin
