@@ -1,99 +1,123 @@
-# Architecture Specification: Dataflow Switching Architecture (Model 1)
+# Architecture Specification: Dataflow Switching Model (Model 1)
 
-## 1. Executive Summary & Design Scope
+> **Intuitive Summary:**
+> Think of this model like a flexible workshop with one team of workers. When a job needs woodworking, the whole room switches to woodworking tools. When a job needs painting, the whole room switches to paint sprayers. It is optimal for each task type, but only **one job can run at a time**.
 
-The **Dataflow Switching Model** represents a single-tenant spatial accelerator capable of reconfiguring its computation dataflow at tile boundaries. In conventional deep learning accelerators (e.g., Google TPU v1), the processing element (PE) array is hardwired to a single dataflow—predominantly **Weight-Stationary (WS)**. While WS achieves near-optimal energy efficiency for convolutional layers where weights can be reused across a large 2D activation grid, it exhibits severe utilization degradation and memory traffic overhead on modern transformer layers such as Self-Attention ($Q \cdot K^T$), where both matrices are transient activations.
+---
 
-Model 1 implements **runtime dataflow switching** across three execution paradigms:
-1. **Weight-Stationary (WS, `2'b00`)**
-2. **Output-Stationary (OS, `2'b01`)**
-3. **Input-Stationary (IS, `2'b10`)**
+## 1. Core Idea & The Problem It Solves
 
-A single tenant occupies the entire physical $M \times N$ systolic mesh. Dataflow selection is controlled dynamically per workload tile via the control bus without requiring FPGA bitstream reconfiguration or power-cycling.
+In traditional deep learning accelerators (such as Google TPU v1), the processing elements (PEs) are hardwired to **Weight-Stationary (WS)** dataflow:
+- Weights are loaded once into PE internal registers and held stationary.
+- Activations stream through the array from left to right.
+- This is great for convolutional layers (CNNs) where the same filter weights are reused across thousands of image pixels.
+
+**The Problem:**
+Modern AI models are no longer just CNNs. Modern pipelines use Transformers (e.g., GPT, BERT, ViT) where the primary operation is **Self-Attention** ($Q \cdot K^T$):
+- Both matrices ($Q$ and $K$) are dynamic activations that change on every token.
+- Forcing a Weight-Stationary array to run Attention requires constantly reloading weights from memory on every cycle, wasting significant bandwidth and power.
+
+**The Model 1 Solution:**
+Model 1 introduces **runtime dataflow switching** to a single-tenant array. A single control register (`cfg_dataflow_mode`) instructs every PE in the array to switch its operand routing on-the-fly:
+1. `2'b00` — **Weight-Stationary (WS):** Weights stay inside PEs; activations stream through. Best for Conv2D & Dense layers.
+2. `2'b01` — **Output-Stationary (OS):** Partial sums accumulate inside PEs; both matrix inputs stream through simultaneously. Best for Transformer Self-Attention ($Q \cdot K^T$).
+3. `2'b10` — **Input-Stationary (IS):** Activations stay inside PEs; filter weights stream through. Best for Depthwise Convolutions.
 
 ---
 
 ## 2. Processing Element (PE) Microarchitecture
 
-Each processing element (`dfs_pe.v`) contains:
-- An 8-bit stationary operand register (`stat_operand_reg`)
-- An 8-bit signed multiplier
-- A 32-bit signed accumulator (`mac_acc`)
-- A runtime operand multiplexing network
+Inside each PE (`dfs_pe.v`), there is an arithmetic datapath with two input multiplexers:
 
 ```
-                        [din_n (North)]
-                              |
-                              v
-                   +---------------------+
-                   |   dfs_pe Datapath   |
-                   |                     |
-   [din_w (West)] -+-> [ MUX_A ]  [ MUX_B ] <- [din_n / stat_reg]
-                   |        \        /   |
-                   |      [ Multiplier ] |
-                   |            |        |
-                   |      [ 32-bit Acc ] |
-                   |            |        |
-                   +------------+--------+
-                                |
-                    [dout_s]    |    [dout_e]
+                            [din_n (North Input)]
+                                      |
+                                      v
+                        +---------------------------+
+                        |       dfs_pe Datapath     |
+                        |                           |
+   [din_w (West Input)]-+---> [ MUX A ]   [ MUX B ] <--- [stat_reg / din_n]
+                        |         \           /     |
+                        |        [ Multiplier ]     |
+                        |               |           |
+                        |      [ 32-bit Accumulator ]
+                        |               |           |
+                        +---------------+-----------+
+                                        |
+                            [dout_s]    |    [dout_e]
 ```
 
-### Operand Routing Truth Table
+### How the Muxes Route Operands
 
-| Mode | `cfg_dataflow_mode` | Multiplier Input A (`mul_a`) | Multiplier Input B (`mul_b`) | Stationary Register Source | Primary Workload Target |
-|:---:|:---:|:---:|:---:|:---:|:---|
-| **WS** | `2'b00` | `stat_operand_reg` (Weight) | `din_w` (Streaming Activation) | West Port (`din_w`) during `w_ld` | Conv2D, Fully-Connected |
-| **OS** | `2'b01` | `din_n` (Streaming Query $Q$) | `din_w` (Streaming Key $K$) | Accumulator registers partial sum | Self-Attention $Q \cdot K^T$ |
-| **IS** | `2'b10` | `stat_operand_reg` (Activation) | `din_w` (Streaming Weight) | North Port (`din_n`) during `w_ld` | Depthwise / Pointwise Conv |
+| Dataflow Mode | Bits | Multiplier Input A (`mul_a`) | Multiplier Input B (`mul_b`) | What Stays Stationary? | What Streams? |
+|---|:---:|---|---|---|---|
+| **Weight-Stationary (WS)** | `2'b00` | Stationary Register (`stat_reg`) | West Input (`din_w`) | Weight (in `stat_reg`) | Activations (West $\to$ East) |
+| **Output-Stationary (OS)** | `2'b01` | North Input (`din_n`) | West Input (`din_w`) | Accumulator (`mac_acc`) | Queries (North $\to$ South), Keys (West $\to$ East) |
+| **Input-Stationary (IS)** | `2'b10` | Stationary Register (`stat_reg`) | West Input (`din_w`) | Input Activation | Filter Weights (West $\to$ East) |
 
 ---
 
 ## 3. 2D Systolic Array Microarchitecture
 
-The array module (`dfs_array.v`) arranges $M$ rows and $N$ columns of PEs into a directional mesh:
-- **North-to-South Channels:** Drive column operands (`din_n`). In row $0$, signals originate from external buffer pins. In row $r > 0$, inputs connect combinationally from `dout_s` of row $r-1$.
-- **West-to-East Channels:** Drive row operands (`din_w`). In col $0$, signals originate from external buffer pins. In col $c > 0$, inputs connect combinationally from `dout_e` of col $c-1$.
-- **Vectorized Module Boundary:** All multi-dimensional ports are packed into 1D vectors (`[NUM_COLS*DATA_W-1:0]`) to ensure clean elaboration in both Verilator and standard synthesis tools.
-
----
-
-## 4. Operational Phases & Cycle Mechanics
-
-A tile computation proceeds through three sequential phases:
+The array module (`dfs_array.v`) connects an $M \times N$ grid of PEs in a clean two-dimensional mesh:
+- **North-to-South Channels (`din_n` $\to$ `dout_s`):** Streams column operands downwards.
+- **West-to-East Channels (`din_w` $\to$ `dout_e`):** Streams row operands rightwards.
+- **Single-Tenant Operation:** All rows and columns in the array operate under the **exact same dataflow mode** simultaneously.
 
 ```
-+--------------------------------------------------------------------------------+
-| Phase 1: Tile Configuration & Accumulator Clear                                 |
-| - Drive `cfg_dataflow_mode` (WS, OS, or IS)                                     |
-| - Assert `tile_acc_clr = 1'b1` for 1 cycle                                      |
-+--------------------------------------------------------------------------------+
-                                       |
-                                       v
-+--------------------------------------------------------------------------------+
-| Phase 2: Stationary Preload (WS / IS modes only)                               |
-| - Assert `tile_w_ld = 1'b1`                                                    |
-| - Drive stationary coefficients on boundary ports (`din_w` for WS, `din_n` for IS)|
-| - PEs capture stationary operand into `stat_operand_reg`                       |
-+--------------------------------------------------------------------------------+
-                                       |
-                                       v
-+--------------------------------------------------------------------------------+
-| Phase 3: Streaming Compute & Accumulation                                       |
-| - Assert `tile_compute_en = 1'b1`                                               |
-| - Stream dynamic operands across boundaries                                     |
-| - Each PE accumulates products: `mac_acc <= mac_acc + (mul_a * mul_b)`          |
-+--------------------------------------------------------------------------------+
+       din_n[0]    din_n[1]    din_n[2]    din_n[3]
+          |           |           |           |
+          v           v           v           v
+din_w[0]->[ PE 0,0 ]->[ PE 0,1 ]->[ PE 0,2 ]->[ PE 0,3 ]-> dout_e[0]
+          |           |           |           |
+          v           v           v           v
+din_w[1]->[ PE 1,0 ]->[ PE 1,1 ]->[ PE 1,2 ]->[ PE 1,3 ]-> dout_e[1]
+          |           |           |           |
+          v           v           v           v
+       dout_s[0]   dout_s[1]   dout_s[2]   dout_s[3]
 ```
 
 ---
 
-## 5. Architectural Strengths and Limitations
+## 4. Cycle-by-Cycle Worked Examples
 
-### Strengths
-1. **Zero Spatial Fragmentation:** Single tenant achieves 100% array utilization on sufficiently large matrix tiles.
-2. **Workload-Matched Energy:** Switching to OS mode avoids streaming accumulators through memory hierarchies for attention operations.
+### Example A: Weight-Stationary Mode (Conv Layer)
+1. **Clear Phase (Cycle 0):** `tile_acc_clr = 1'b1` resets all PE accumulators to `0`.
+2. **Preload Phase (Cycle 1):** `tile_w_ld = 1'b1`. West input supplies weight `5`. PE captures `stat_reg = 5`.
+3. **Compute Phase (Cycles 2–5):** `tile_compute_en = 1'b1`. West input streams activation `3` for 4 consecutive cycles:
+   - Cycle 2: `mac_acc = 0 + (5 * 3) = 15`
+   - Cycle 3: `mac_acc = 15 + 15 = 30`
+   - Cycle 4: `mac_acc = 30 + 15 = 45`
+   - Cycle 5: `mac_acc = 45 + 15 = 60`
+   - Result: PE holds final convolution result `60`.
 
-### Limitations (The Multi-Tenancy Bottleneck)
-1. **Head-of-Line (HoL) Blocking:** When concurrent small models (e.g., CNN + Attention) arrive, one must wait in an external queue until the other completes its entire tile sequence.
-2. **Under-Utilization on Small Batches:** A small $2 \times 2$ matrix running on an $8 \times 8$ array leaves $75\%$ of PEs completely idle. Spatial fission is required to eliminate this inefficiency.
+### Example B: Output-Stationary Mode (Attention $Q \cdot K^T$)
+1. **Clear Phase (Cycle 0):** `tile_acc_clr = 1'b1`. `cfg_dataflow_mode = 2'b01`.
+2. **Streaming Phase (Cycles 1–3):** No preload needed! Both operands stream dynamically:
+   - Cycle 1: North supplies Query $Q = 4$; West supplies Key $K = 7$.
+     `mac_acc = 0 + (4 * 7) = 28`
+   - Cycle 2: North supplies $Q = 2$; West supplies $K = 6$.
+     `mac_acc = 28 + (2 * 6) = 28 + 12 = 40`
+   - Cycle 3: North supplies $Q = 3$; West supplies $K = 5$.
+     `mac_acc = 40 + (3 * 5) = 40 + 15 = 55`
+   - Result: PE holds final dot-product attention score `55`.
+
+### Example C: Input-Stationary Mode (Depthwise Conv)
+1. **Clear Phase (Cycle 0):** `tile_acc_clr = 1'b1`. `cfg_dataflow_mode = 2'b10`.
+2. **Preload Phase (Cycle 1):** `tile_w_ld = 1'b1`. North input supplies activation `6`. PE captures `stat_operand_reg = 6`.
+3. **Compute Phase (Cycles 2–4):** `tile_compute_en = 1'b1`. West input streams filter weight `4` over 3 consecutive cycles:
+   - Cycle 2: `mac_acc = 0 + (6 * 4) = 24`
+   - Cycle 3: `mac_acc = 24 + 24 = 48`
+   - Cycle 4: `mac_acc = 48 + 24 = 72`
+   - Result: PE holds final depthwise convolution result `72`.
+
+---
+
+## 5. Architectural Trade-offs & Limitations
+
+| Advantage | Limitation |
+|---|---|
+| **Optimal Energy per Layer:** Each neural network layer uses its mathematically best dataflow, cutting memory traffic. | **Head-of-Line (HoL) Queue Blocking:** When two models arrive at the pod, Model 2 must wait in an external queue until Model 1 finishes its entire sequence. |
+| **Simple Hardware Control:** One global mode register controls the entire array. | **Poor Utilization on Small Models:** If a small model needs only 4 PEs on a 16×16 array, 252 PEs sit idle. It cannot share the array with another tenant. |
+
+This limitation directly motivates **Spatial Fission (Model 2)** and our **Novel Heterogeneous Fission (Model 3)**.

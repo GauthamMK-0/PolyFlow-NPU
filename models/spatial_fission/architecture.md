@@ -1,67 +1,94 @@
-# Architecture Specification: Homogeneous Spatial Fission Architecture (Model 2)
+# Architecture Specification: Homogeneous Spatial Fission Model (Model 2)
 
-## 1. Executive Summary & Design Scope
-
-The **Spatial Fission Model** represents a multi-tenant accelerator that dynamically partitions a single physical 2D systolic array into multiple isolated execution regions (e.g., Region A and Region B). This architecture corresponds to **Configuration A** in the evaluation framework (and follows the design philosophy of state-of-the-art spatial partitioning accelerators such as MICRO'20 *Planaria*).
-
-### Fundamental Architectural Trade-off
-- **Spatial Multi-Tenancy:** Enabled. Distinct inference tasks run concurrently on disjoint column slices of the physical mesh, eliminating Head-of-Line (HoL) queue stalls and maximizing utilization on small-to-medium batch sizes.
-- **Dataflow Homogeneity:** All partitioned regions are **rigidly locked to Weight-Stationary (WS)** dataflow. PEs lack runtime dataflow selection multiplexers.
+> **Intuitive Summary:**
+> Think of this model like dividing a large highway into two separate, physical lanes with a median wall down the middle. Two different cars can drive at the same time without hitting each other. However, **both cars are forced to drive at the exact same gear and speed (Weight-Stationary only)**.
 
 ---
 
-## 2. Dynamic Column Partitioning & Boundary Isolation
+## 1. Core Idea & The Problem It Solves
 
-### 2.1 Fission Decoder (`sfa_fission_decoder.v`)
-At dispatch time, the host controller writes a split column index `cfg_split_col` and pulses `cfg_update_strobe`. The decoder generates:
-1. `region_id_mask[c]`: High for columns assigned to Region B ($c \ge \text{cfg\_split\_col}$), Low for Region A ($c < \text{cfg\_split\_col}$).
-2. `region_reassign_bus[c]`: 1-cycle strobe indicating which columns have crossed region ownership boundaries.
+In Model 1, when two separate AI models need to run (e.g., an object detector and a speech recognizer in a smart vehicle), they must wait in line. While one model occupies the array, the other waits. If either model is small, most of the chip's PEs sit completely idle.
+
+**The Model 2 Solution:**
+Model 2 introduces **Spatial Fission** (following the architecture of prior research such as MICRO'20 *Planaria*):
+- The physical $M \times N$ systolic array is dynamically sliced into **independent sub-arrays (Region A and Region B)** at runtime.
+- Region A can compute Model 1, while Region B simultaneously computes Model 2 on the exact same clock cycle.
+- **The Constraint:** Both Region A and Region B are **rigidly locked to Weight-Stationary (WS)** dataflow. There is no per-region dataflow switching.
+
+---
+
+## 2. Dynamic Column Slicing & Boundary Isolation
+
+### 2.1 The Fission Decoder (`sfa_fission_decoder.v`)
+At dispatch time, the host controller sends a split column index `cfg_split_col` (e.g., `4'd2` on a 4-column array):
+- Columns $c < 2$ (Cols 0 and 1) are marked as **Region A** (`region_id_mask = 0`).
+- Columns $c \ge 2$ (Cols 2 and 3) are marked as **Region B** (`region_id_mask = 1`).
 
 ```
-       Array Boundary (cfg_split_col = 2)
-              |
-   Region A   |   Region B
- [Col 0][Col 1] [Col 2][Col 3]
-       ======>|  (Inter-region isolation: wires zeroed)
-              |
-              +--> Direct feed from din_w_region_b
+           Physical Array Sliced at Column 2
+           
+       [ Region A ]            [ Region B ]
+      Col 0    Col 1          Col 2    Col 3
+     +------+ +------+  ||   +------+ +------+
+     |  PE  | |  PE  |  ||   |  PE  | |  PE  |
+     +------+ +------+  ||   +------+ +------+
+                        ||
+                 Active Barrier
+               (Cross-Wires Zeroed)
 ```
 
 ### 2.2 Hardware Boundary Isolation (`sfa_array.v`)
-To ensure zero inter-tenant data bleeding, horizontal systolic connections (`mesh_w`) crossing a region boundary are electrically isolated:
-$$\text{mesh\_w}[r][c] = (\text{region\_id\_mask}[c] \ne \text{region\_id\_mask}[c-1]) \ ?\ \text{din\_w\_region\_b}[r] : \text{mesh\_e}[r][c-1]$$
-- PEs in Region A receive their West inputs from external pins (`din_w`) and forward eastwards.
-- Column $c = \text{cfg\_split\_col}$ isolates Region B from Region A by multiplexing directly to `din_w_region_b`, completely cutting off residual signals from Region A.
+In a normal systolic array, PE outputs pass combinationally from left to right. If left untreated, activations from Region A would leak right into Region B and corrupt its calculations.
+
+To prevent this, the boundary PE at column `cfg_split_col` severs the connection from the left and routes to a dedicated input pin (`din_w_region_b`):
+$$\text{Input to Col } c = \begin{cases} \text{din\_w\_region\_b} & \text{if crossing the boundary} \\ \text{mesh output from left} & \text{otherwise} \end{cases}$$
+This provides **electrical isolation**: Region A and Region B run completely independently with **zero cross-talk**.
 
 ---
 
-## 3. Memory Subsystem & Co-Tenant Security
+## 3. Shared Memory Subsystem & Multi-Tenant Safety
 
-Multi-tenancy introduces shared memory contention and potential information leakage. Model 2 incorporates three dedicated hardware controllers to guarantee fair bandwidth allocation and provable spatial isolation:
+When multiple tenants share an accelerator chip, they share the on-chip memory banks. Model 2 includes three dedicated hardware safety engines:
 
-### 3.1 Event-Driven Phase-Pinned Arbiter (EPPA, `sfa_eppa.v`)
-Instead of performing complex round-robin arbitration on every 1 GHz clock cycle, EPPA monitors coarse-grained execution phases (`phase_tag`):
-- `PH_BURST` (`2'b00`): Weight preload phase $\rightarrow$ Allocates maximum memory bandwidth (`0xFF`).
-- `PH_STREAM` (`2'b10`): Steady-state streaming compute $\rightarrow$ Allocates balanced bandwidth (`0x7F`).
-- `PH_IDLE` (`2'b01`): Execution finished or waiting $\rightarrow$ Zero bandwidth allocation (`0x00`).
-- `PH_RECONFIG` (`2'b11`): Transition phase $\rightarrow$ Asserts `reconfig_urgent` strobe.
+### 3.1 EPPA Bandwidth Arbiter (`sfa_eppa.v`)
+To avoid memory bandwidth contention, the Event-Driven Phase-Pinned Arbiter monitors execution phases:
+- `PH_BURST` (`2'b00`): Region is preloading weights $\to$ gets **100% memory bandwidth (`0xFF`)**.
+- `PH_STREAM` (`2'b10`): Region is streaming activations $\to$ gets **50% balanced bandwidth (`0x7F`)**.
+- `PH_IDLE` (`2'b01`): Region is waiting $\to$ gets **0% bandwidth (`0x00`)**.
+Bandwidth is updated only during phase transitions and stays pinned during compute, keeping the clock path fast.
 
-Bandwidth is pinned quasi-statically during steady-state, eliminating clock-frequency bottlenecks.
+### 3.2 OTP Token Protocol (`sfa_otp_fsm.v`)
+To prevent two regions from modifying the same memory bank simultaneously, banks use a Single-Writer Ownership Token. A rotating epoch counter rotates priority between Region A and Region B so neither tenant is ever starved.
 
-### 3.2 Ownership Token Protocol (OTP, `sfa_otp_fsm.v`)
-Shared memory banks use a single-writer ownership protocol. A region must acquire the bank's token before writing or reconfiguring it. To prevent starvation, an epoch counter periodically increments `priority_base`, rotating grant priority among regions.
-
-### 3.3 Mandatory Hardware Bank Scrubbing (`sfa_bank_scrub.v`)
-When a memory bank is transferred from Region A to Region B:
-1. `role_reassign` triggers `scrub_active = 1'b1`.
-2. The controller executes a **4-cycle mandatory zeroing sequence**, actively clearing residual weight/activation data left by the previous tenant.
-3. Only after the 4th cycle does `bank_role_clear` pulse, un-gating PEs in the new region.
-4. This provably thwarts data retention and side-channel cross-tenant sniffing attacks.
+### 3.3 Mandatory 4-Cycle Bank Scrubbing (`sfa_bank_scrub.v`)
+When a memory bank is transferred from Region A to Region B, there is a risk that Region B could read residual sensitive weights from Region A (a data retention security attack).
+- The hardware enforces a **mandatory 4-cycle zeroing scrub**.
+- The bank is actively overwritten with zeroes before `bank_role_clear` is signaled to Region B.
 
 ---
 
-## 4. Architectural Limitations of Homogeneous Fission
+## 4. Cycle-by-Cycle Worked Example
 
-While Model 2 successfully enables concurrent spatial multi-tenancy:
-1. **Dataflow Mismatch:** Locking all regions to Weight-Stationary forces Transformer Attention tiles ($Q \cdot K^T$) to execute sub-optimally, generating $3\times$ to $5\times$ higher SRAM writeback energy compared to Output-Stationary.
-2. **Substrate Inflexibility:** Workload diversity in modern AI models requires heterogeneous dataflow freedom *within* spatial partitions.
+In our testbench, a 4-column array is split symmetrically at column 2:
+1. **Partition Step (Cycle 0):** `cfg_split_col = 2`. Mask becomes `1100` (Cols 0–1 = Reg A, Cols 2–3 = Reg B).
+2. **Preload Step (Cycle 1):** Both regions preload stationary weights at the same time:
+   - Region A preloads weight $W_A = 5$.
+   - Region B preloads weight $W_B = 7$.
+3. **Concurrent Compute (Cycles 2–5):** Both regions stream activations simultaneously:
+   - Region A streams activation $X_A = 3$ into columns 0–1.
+   - Region B streams activation $X_B = 2$ into columns 2–3.
+   - Accumulator equations over 4 cycles:
+     $$\text{Region A PE[0][0]} = 4 \times (5 \times 3) = 60$$
+     $$\text{Region B PE[0][2]} = 4 \times (7 \times 2) = 56$$
+   - Both results complete on the exact same clock cycle without interfering with each other.
+
+---
+
+## 5. Architectural Trade-offs & Limitations
+
+| Advantage | Limitation |
+|---|---|
+| **Eliminates Queue Stalls:** Two models run concurrently, cutting latency for multi-tenant serving. | **Dataflow Inflexibility:** All regions must run Weight-Stationary. If Region B runs a Transformer Self-Attention, it wastes massive memory power. |
+| **High Hardware Efficiency:** Hardware boundary barrier prevents data corruption with minimal silicon overhead. | **Substrate Rigidity:** Cannot adapt per-region dataflow to match diverse multi-modal AI workloads. |
+
+This limitation directly motivates our **Novel Heterogeneous Fission Model (Model 3)**.
