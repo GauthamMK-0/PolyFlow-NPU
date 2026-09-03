@@ -1,62 +1,132 @@
 // fig0_comparison.dot
-// Side-by-side strip: A | B | C evaluation configurations at a glance.
-// Render: dot -Tpng -Gdpi=140 fig0_comparison.dot -o fig0_comparison.png
+// Comprehensive side-by-side taxonomy comparing Configurations A, B, and C.
+// Render: dot -Tpng -Gdpi=160 fig0_comparison.dot -o fig0_comparison.png
 
-digraph STRIP {
-  graph [fontname="DejaVu Sans", rankdir=TB,
-         label="DRDS-NPU evaluation configurations at a glance",
-         labelloc=b, fontsize=14, pad=0.2];
+digraph FIG0_COMPARISON {
+  graph [fontname="Helvetica,Arial,sans-serif", rankdir=TB,
+         label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+                 <TR><TD><FONT POINT-SIZE="16"><B>PolyFlow-NPU: Architectural Exploration Space</B></FONT></TD></TR>
+                 <TR><TD><FONT POINT-SIZE="11" COLOR="#475569">Comparison of Baseline Configurations vs. Proposed Novel Heterogeneous Fission</FONT></TD></TR>
+               </TABLE>>,
+         labelloc=t, fontsize=14, pad=0.3, bgcolor="#FFFFFF"];
 
-  node [shape=plaintext, fontname="DejaVu Sans"];
+  node [shape=plaintext, fontname="Helvetica,Arial,sans-serif"];
   edge [style=invis];
 
-  strip [label=<
-    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="10" CELLPADDING="10">
-
+  comparison_matrix [label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="16" CELLPADDING="0">
       <TR>
-        <TD BGCOLOR="#FFFFFF">
-          <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="2" CELLPADDING="7">
-            <TR><TD COLSPAN="4" BGCOLOR="#DAE8FC"><FONT POINT-SIZE="10"><B>Region A</B> — WS pinned</FONT></TD><TD BORDER="1" BGCOLOR="#FFCCCC"> </TD><TD COLSPAN="4" BGCOLOR="#D5E8D4"><FONT POINT-SIZE="10"><B>Region B</B> — WS pinned</FONT></TD></TR>
-            <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD><TD BGCOLOR="#FFCCCC"> </TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
-            <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD><TD BGCOLOR="#FFCCCC"> </TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
-            <TR><TD COLSPAN="9" BGCOLOR="#FFFFFF"><FONT POINT-SIZE="9">split + concurrent · both muxes forced to PIN_DFLOW</FONT></TD></TR>
+        <!-- ==================== CONFIGURATION A ==================== -->
+        <TD BGCOLOR="#F8FAFC" COLOR="#94A3B8" CELLPADDING="12">
+          <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="4" CELLPADDING="4" WIDTH="300">
+            <TR><TD BGCOLOR="#0284C7" ALIGN="CENTER"><FONT COLOR="#FFFFFF" POINT-SIZE="12"><B>Configuration A</B></FONT></TD></TR>
+            <TR><TD ALIGN="CENTER"><FONT POINT-SIZE="11"><B>Homogeneous Spatial Fission</B></FONT><BR/><FONT POINT-SIZE="9" COLOR="#64748B">(Planaria / SARA Baseline)</FONT></TD></TR>
+            <TR><TD BGCOLOR="#CBD5E1" HEIGHT="1"></TD></TR>
+            
+            <!-- Array Grid Visualization -->
+            <TR><TD ALIGN="CENTER">
+              <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="1" CELLPADDING="5" COLOR="#CBD5E1">
+                <TR>
+                  <TD COLSPAN="3" BGCOLOR="#BAE6FD"><FONT POINT-SIZE="9"><B>Region A (Cols 0-7)</B><BR/>Pinned: <B>WS</B></FONT></TD>
+                  <TD BGCOLOR="#FCA5A5" WIDTH="8"><FONT POINT-SIZE="8">|</FONT></TD>
+                  <TD COLSPAN="3" BGCOLOR="#BBF7D0"><FONT POINT-SIZE="9"><B>Region B (Cols 8-15)</B><BR/>Pinned: <B>WS</B></FONT></TD>
+                </TR>
+                <TR>
+                  <TD BGCOLOR="#F0F9FF"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#F0F9FF"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#F0F9FF"><FONT POINT-SIZE="8">…</FONT></TD>
+                  <TD BGCOLOR="#FCA5A5"><FONT POINT-SIZE="8">|</FONT></TD>
+                  <TD BGCOLOR="#F0FDF4"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#F0FDF4"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#F0FDF4"><FONT POINT-SIZE="8">…</FONT></TD>
+                </TR>
+                <TR>
+                  <TD BGCOLOR="#F0F9FF"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#F0F9FF"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#F0F9FF"><FONT POINT-SIZE="8">…</FONT></TD>
+                  <TD BGCOLOR="#FCA5A5"><FONT POINT-SIZE="8">|</FONT></TD>
+                  <TD BGCOLOR="#F0FDF4"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#F0FDF4"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#F0FDF4"><FONT POINT-SIZE="8">…</FONT></TD>
+                </TR>
+              </TABLE>
+            </TD></TR>
+
+            <TR><TD BGCOLOR="#CBD5E1" HEIGHT="1"></TD></TR>
+            <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9">
+              • <B>Spatial Multi-Tenancy:</B> <FONT COLOR="#16A34A">Yes (Dynamic Fission)</FONT><BR/>
+              • <B>Dataflow Flexibility:</B> <FONT COLOR="#DC2626">Rigid (WS Pinned)</FONT><BR/>
+              • <B>Execution Mode:</B> Concurrent Co-Execution<BR/>
+              • <B>Limitation:</B> Inefficient on Attention (Q·K<SUP>T</SUP>)<BR/>
+              • <B>Memory Architecture:</B> Shared Banks + EPPA
+            </FONT></TD></TR>
           </TABLE>
         </TD>
 
-        <TD BGCOLOR="#FFFFFF">
-          <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="2" CELLPADDING="7">
-            <TR><TD COLSPAN="9" BGCOLOR="#DAE8FC"><FONT POINT-SIZE="10"><B>Tenant</B> — full span cols 0–15</FONT></TD></TR>
-            <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
-            <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
-            <TR><TD COLSPAN="9" BGCOLOR="#FFFFFF"><FONT POINT-SIZE="9">unsplit · serial: P[WS] ⇒ Q[OS] ⇒ P[WS] ⇒ …</FONT></TD></TR>
+        <!-- ==================== CONFIGURATION B ==================== -->
+        <TD BGCOLOR="#F8FAFC" COLOR="#94A3B8" CELLPADDING="12">
+          <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="4" CELLPADDING="4" WIDTH="300">
+            <TR><TD BGCOLOR="#475569" ALIGN="CENTER"><FONT COLOR="#FFFFFF" POINT-SIZE="12"><B>Configuration B</B></FONT></TD></TR>
+            <TR><TD ALIGN="CENTER"><FONT POINT-SIZE="11"><B>Sequential Dataflow Switching</B></FONT><BR/><FONT POINT-SIZE="9" COLOR="#64748B">(ReDas / Single-Tenant Baseline)</FONT></TD></TR>
+            <TR><TD BGCOLOR="#CBD5E1" HEIGHT="1"></TD></TR>
+
+            <!-- Array Grid Visualization -->
+            <TR><TD ALIGN="CENTER">
+              <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="1" CELLPADDING="5" COLOR="#CBD5E1">
+                <TR>
+                  <TD COLSPAN="7" BGCOLOR="#E2E8F0"><FONT POINT-SIZE="9"><B>Single Tenant (Cols 0-15)</B><BR/>Full Array Mux: <B>WS ⇄ OS ⇄ IS</B></FONT></TD>
+                </TR>
+                <TR>
+                  <TD BGCOLOR="#FFFFFF"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#FFFFFF"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#FFFFFF"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#FFFFFF"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#FFFFFF"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#FFFFFF"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#FFFFFF"><FONT POINT-SIZE="8">…</FONT></TD>
+                </TR>
+                <TR>
+                  <TD BGCOLOR="#FFFFFF"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#FFFFFF"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#FFFFFF"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#FFFFFF"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#FFFFFF"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#FFFFFF"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#FFFFFF"><FONT POINT-SIZE="8">…</FONT></TD>
+                </TR>
+              </TABLE>
+            </TD></TR>
+
+            <TR><TD BGCOLOR="#CBD5E1" HEIGHT="1"></TD></TR>
+            <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9">
+              • <B>Spatial Multi-Tenancy:</B> <FONT COLOR="#DC2626">No (Single Tenant)</FONT><BR/>
+              • <B>Dataflow Flexibility:</B> <FONT COLOR="#16A34A">High (WS / OS / IS)</FONT><BR/>
+              • <B>Execution Mode:</B> Serial Tile Sequence<BR/>
+              • <B>Limitation:</B> Head-of-Line Multi-Model Queue Stalls<BR/>
+              • <B>Memory Architecture:</B> Unified Dedicated Buffer
+            </FONT></TD></TR>
           </TABLE>
         </TD>
 
-        <TD BGCOLOR="#FFFFF3">
-          <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="2" CELLPADDING="7" COLOR="#B8A000">
-            <TR><TD COLSPAN="4" BGCOLOR="#DAE8FC"><FONT POINT-SIZE="10"><B>Region A</B> — WS</FONT></TD><TD BORDER="1" BGCOLOR="#FFCCCC"> </TD><TD COLSPAN="4" BGCOLOR="#D5E8D4"><FONT POINT-SIZE="10"><B>Region B</B> — OS</FONT></TD></TR>
-            <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD><TD BGCOLOR="#FFCCCC"> </TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
-            <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD><TD BGCOLOR="#FFCCCC"> </TD><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
-            <TR><TD COLSPAN="9" BGCOLOR="#FFFFF3"><FONT POINT-SIZE="9"><B>split + concurrent · each mux free per tile</B></FONT></TD></TR>
+        <!-- ==================== CONFIGURATION C (NOVEL) ==================== -->
+        <TD BGCOLOR="#FEFCE8" COLOR="#CA8A04" CELLPADDING="12">
+          <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="4" CELLPADDING="4" WIDTH="320">
+            <TR><TD BGCOLOR="#D97706" ALIGN="CENTER"><FONT COLOR="#FFFFFF" POINT-SIZE="12"><B>Configuration C (Ours)</B></FONT></TD></TR>
+            <TR><TD ALIGN="CENTER"><FONT POINT-SIZE="11"><B>Heterogeneous Fission</B></FONT><BR/><FONT POINT-SIZE="9" COLOR="#B45309"><B>★ PolyFlow-NPU Proposed Novelty ★</B></FONT></TD></TR>
+            <TR><TD BGCOLOR="#FDE047" HEIGHT="1"></TD></TR>
+
+            <!-- Array Grid Visualization -->
+            <TR><TD ALIGN="CENTER">
+              <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="1" CELLPADDING="5" COLOR="#CA8A04">
+                <TR>
+                  <TD COLSPAN="3" BGCOLOR="#BAE6FD"><FONT POINT-SIZE="9"><B>Region A (Cols 0-7)</B><BR/>Mode: <B>WS (CNN Conv)</B></FONT></TD>
+                  <TD BGCOLOR="#EF4444" WIDTH="8"><FONT COLOR="#FFFFFF" POINT-SIZE="8"><B>‖</B></FONT></TD>
+                  <TD COLSPAN="3" BGCOLOR="#FEF08A"><FONT POINT-SIZE="9"><B>Region B (Cols 8-15)</B><BR/>Mode: <B>OS (Attention)</B></FONT></TD>
+                </TR>
+                <TR>
+                  <TD BGCOLOR="#F0F9FF"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#F0F9FF"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#F0F9FF"><FONT POINT-SIZE="8">…</FONT></TD>
+                  <TD BGCOLOR="#EF4444"><FONT COLOR="#FFFFFF" POINT-SIZE="8"><B>‖</B></FONT></TD>
+                  <TD BGCOLOR="#FEFCE8"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#FEFCE8"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#FEFCE8"><FONT POINT-SIZE="8">…</FONT></TD>
+                </TR>
+                <TR>
+                  <TD BGCOLOR="#F0F9FF"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#F0F9FF"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#F0F9FF"><FONT POINT-SIZE="8">…</FONT></TD>
+                  <TD BGCOLOR="#EF4444"><FONT COLOR="#FFFFFF" POINT-SIZE="8"><B>‖</B></FONT></TD>
+                  <TD BGCOLOR="#FEFCE8"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#FEFCE8"><FONT POINT-SIZE="8">PE</FONT></TD><TD BGCOLOR="#FEFCE8"><FONT POINT-SIZE="8">…</FONT></TD>
+                </TR>
+              </TABLE>
+            </TD></TR>
+
+            <TR><TD BGCOLOR="#FDE047" HEIGHT="1"></TD></TR>
+            <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9">
+              • <B>Spatial Multi-Tenancy:</B> <FONT COLOR="#16A34A"><B>Yes (Dynamic Fission)</B></FONT><BR/>
+              • <B>Dataflow Flexibility:</B> <FONT COLOR="#16A34A"><B>Per-Region Free (WS/OS/IS)</B></FONT><BR/>
+              • <B>Execution Mode:</B> <B>Simultaneous Heterogeneous Co-Run</B><BR/>
+              • <B>Hardware Safety:</B> Dynamic Boundary Zeroing Barrier<BR/>
+              • <B>Security Substrate:</B> EPPA + OTP Token + 4-cyc Scrub
+            </FONT></TD></TR>
           </TABLE>
         </TD>
       </TR>
-
-      <TR>
-        <TD ALIGN="TEXT">
-          <FONT POINT-SIZE="11"><B>A — Homogeneous-dataflow fission</B></FONT><BR/>
-          <FONT POINT-SIZE="9">fission only · per-region switching removed<BR ALIGN="LEFT"/>(captures homogeneous-dataflow constraint)<BR ALIGN="LEFT"/></FONT>
-        </TD>
-        <TD ALIGN="TEXT">
-          <FONT POINT-SIZE="11"><B>B — Sequential dataflow switching</B></FONT><BR/>
-          <FONT POINT-SIZE="9">switching only · concurrency removed<BR ALIGN="LEFT"/>(captures single-tenant constraint)<BR ALIGN="LEFT"/></FONT>
-        </TD>
-        <TD BGCOLOR="#FFFFF3" ALIGN="TEXT">
-          <FONT POINT-SIZE="11"><B>C — Heterogeneous fission (novel)</B></FONT><BR/>
-          <FONT POINT-SIZE="9">= fission + per-region dataflow selection<BR ALIGN="LEFT"/>both ideas composed<BR ALIGN="LEFT"/></FONT>
-        </TD>
-      </TR>
-
     </TABLE>
   >];
 }

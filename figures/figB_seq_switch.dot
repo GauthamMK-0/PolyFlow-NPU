@@ -1,47 +1,95 @@
 // figB_seq_switch.dot
-// Config B — Sequential dataflow switching (baseline): whole-array tenant, one tile at a time.
-// Render: scripts/render_figures.sh
+// Configuration B: Sequential Dataflow Switching Architecture (ReDas Baseline)
+// Render: dot -Tpng -Gdpi=160 figB_seq_switch.dot -o figB_seq_switch.png
 
-digraph CFG_B {
-  graph [fontname="DejaVu Sans", rankdir=TB, compound=true,
-         label="Config B — Sequential dataflow switching\lfull array, one tile at a time, dataflow free per tile\l(SINGLE_TENANT=1)\l",
-         labelloc=b, fontsize=13, pad=0.25];
+digraph FIG_B {
+  graph [fontname="Helvetica,Arial,sans-serif", rankdir=TB, compound=true,
+         label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+                 <TR><TD><FONT POINT-SIZE="16"><B>Configuration B: Sequential Dataflow Switching Architecture</B></FONT></TD></TR>
+                 <TR><TD><FONT POINT-SIZE="11" COLOR="#475569">Single-Tenant Execution with Dynamic Per-Tile Dataflow Reconfiguration (WS ⇄ OS ⇄ IS)</FONT></TD></TR>
+               </TABLE>>,
+         labelloc=t, fontsize=14, pad=0.3, bgcolor="#FFFFFF"];
 
-  node  [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=11,
-         fillcolor="#F5F5F5", color="#666666", margin="0.16,0.09"];
-  edge  [fontname="DejaVu Sans", fontsize=10, color="#444444"];
+  node  [shape=box, style="rounded,filled", fontname="Helvetica,Arial,sans-serif", fontsize=10,
+         fillcolor="#F8FAFC", color="#94A3B8", penwidth=1.2, margin="0.15,0.1"];
+  edge  [fontname="Helvetica,Arial,sans-serif", fontsize=9, color="#475569", penwidth=1.2];
 
-  host [label="Host / Scheduler\n(one tile at a time)", fillcolor="#EFEFEF"];
+  // ==================== HOST DISPATCH & TIMELINE ====================
+  subgraph cluster_dispatch {
+    label=<<B>Host Tile Scheduler &amp; Sequential Queue</B>>;
+    fontsize=11; fontcolor="#1E293B";
+    style="rounded,dashed"; color="#94A3B8"; bgcolor="#F1F5F9";
 
-  tl [shape=box, style="filled", fillcolor="#FFFDE7", color="#B8A000", fontsize=11,
-      label="timeline:   P-tile [WS]  ⇒  Q-tile [OS]  ⇒  P-tile [WS]  ⇒  …\lthe two streams never overlap\l"];
-  host -> tl;
+    host_ctrl [label="Host Tile Dispatcher\n(Single-Tenant Queue)", fillcolor="#FFFFFF", color="#64748B"];
 
-  regF [label=<
-    <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#6C8EBF">
-      <TR><TD COLSPAN="4" BGCOLOR="#DAE8FC"><B>Tenant</B> · full array, cols 0–15</TD></TR>
-      <TR><TD COLSPAN="4">Dataflow: <B>free per tile</B> — WS ⇄ OS ⇄ IS</TD></TR>
-      <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
-      <TR><TD>PE</TD><TD>PE</TD><TD>PE</TD><TD>…</TD></TR>
-    </TABLE>>, fillcolor="#FFFFFF"];
+    timeline [label=<
+      <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="2" CELLPADDING="6" COLOR="#64748B">
+        <TR><TD COLSPAN="3" BGCOLOR="#CBD5E1"><FONT POINT-SIZE="9"><B>Sequential Execution Timeline (Zero Concurrency / HoL Blocking)</B></FONT></TD></TR>
+        <TR>
+          <TD BGCOLOR="#DBEAFE"><FONT POINT-SIZE="8"><B>Tile k: Conv/FC</B><BR/>Mode: <B>WS (2'b00)</B></FONT></TD>
+          <TD BGCOLOR="#FEF3C7"><FONT POINT-SIZE="8"><B>Tile k+1: Attention</B><BR/>Mode: <B>OS (2'b01)</B></FONT></TD>
+          <TD BGCOLOR="#E0E7FF"><FONT POINT-SIZE="8"><B>Tile k+2: Depthwise</B><BR/>Mode: <B>IS (2'b10)</B></FONT></TD>
+        </TR>
+      </TABLE>>, fillcolor="#FFFFFF", shape=plaintext];
 
-  tl -> regF [label="next tile"];
-
-  safety [label="OTP token + scrub\n(per bank)", fillcolor="#FFF4F0", color="#C0392B"];
-  regF -> safety [dir=both, label="token"];
-
-  subgraph cluster_banks {
-    label=" "; style="rounded"; color="#CCCCCC";
-    b0 [label="bank",           fillcolor="#FFE6CC", color="#D79B00", fontsize=10];
-    b1 [label="bank",           fillcolor="#FFE6CC", color="#D79B00", fontsize=10];
-    b2 [label="bank",           fillcolor="#FFE6CC", color="#D79B00", fontsize=10];
-    b3 [label="bank",           fillcolor="#FFE6CC", color="#D79B00", fontsize=10];
+    host_ctrl -> timeline [label=" Issue sequential tiles"];
   }
 
-  regF -> b1 [dir=back, label="in", weight=2];
-  regF -> b2 [label="out", weight=2];
+  // ==================== COMPUTE FABRIC ====================
+  subgraph cluster_compute {
+    label=<<B>Full-Span Systolic Compute Fabric (16×16 PEs — Single Tenant)</B>>;
+    fontsize=12; fontcolor="#0F172A";
+    style="rounded"; color="#64748B"; bgcolor="#FAFAFA";
 
-  eppa [label="EPPA arbiter\n(lane B parked)", fillcolor="#E8EAF6", color="#3949AB"];
-  regF -> eppa [label="phase"];
-  eppa -> b0 [lhead=cluster_banks, label="bw"];
+    full_array [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6" COLOR="#475569">
+        <TR><TD COLSPAN="6" BGCOLOR="#334155"><FONT COLOR="#FFFFFF" POINT-SIZE="10"><B>Full Physical Array (Columns 0–15)</B></FONT></TD></TR>
+        <TR><TD COLSPAN="6" BGCOLOR="#E2E8F0"><FONT POINT-SIZE="9">Dynamic Runtime Selection: <B>cfg_dataflow_mode [WS / OS / IS]</B></FONT></TD></TR>
+        <TR>
+          <TD BGCOLOR="#FFFFFF">PE[0,0]</TD><TD BGCOLOR="#FFFFFF">PE[0,1]</TD><TD BGCOLOR="#FFFFFF">PE[0,2]</TD>
+          <TD BGCOLOR="#FFFFFF">PE[0,3]</TD><TD BGCOLOR="#FFFFFF">…</TD><TD BGCOLOR="#FFFFFF">PE[0,15]</TD>
+        </TR>
+        <TR>
+          <TD BGCOLOR="#FFFFFF">PE[1,0]</TD><TD BGCOLOR="#FFFFFF">PE[1,1]</TD><TD BGCOLOR="#FFFFFF">PE[1,2]</TD>
+          <TD BGCOLOR="#FFFFFF">PE[1,3]</TD><TD BGCOLOR="#FFFFFF">…</TD><TD BGCOLOR="#FFFFFF">PE[1,15]</TD>
+        </TR>
+        <TR><TD COLSPAN="6" BGCOLOR="#F8FAFC"><FONT POINT-SIZE="8" COLOR="#475569">All 256 PEs execute the same dataflow synchronously</FONT></TD></TR>
+      </TABLE>>, fillcolor="#FFFFFF", shape=plaintext];
+
+    pe_detail [label=<
+      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5" COLOR="#0284C7">
+        <TR><TD COLSPAN="2" BGCOLOR="#0284C7"><FONT COLOR="#FFFFFF" POINT-SIZE="9"><B>dfs_pe Datapath</B></FONT></TD></TR>
+        <TR><TD BGCOLOR="#F0F9FF" ALIGN="LEFT"><FONT POINT-SIZE="8">
+          • 8-bit Stationary Reg<BR/>
+          • 8-bit Signed Multiplier<BR/>
+          • 32-bit Accumulator<BR/>
+          • Runtime Operand Mux
+        </FONT></TD></TR>
+      </TABLE>>, fillcolor="#FFFFFF", shape=plaintext];
+
+    {rank=same; full_array; pe_detail;}
+  }
+
+  timeline -> full_array [label=" Tile dataflow config", lhead=cluster_compute, color="#2563EB", penwidth=1.5];
+  full_array -> pe_detail [style=dotted, label=" PE structure", arrowhead=none];
+
+  // ==================== UNIFIED MEMORY SUBSYSTEM ====================
+  subgraph cluster_memory {
+    label=<<B>Dedicated Unified On-Chip Memory Banks</B>>;
+    fontsize=11; fontcolor="#1E293B";
+    style="rounded,dashed"; color="#D97706"; bgcolor="#FFFBEB";
+
+    mb0 [label="SRAM Bank 0\n[Stationary Operands]\nWeights (WS) / Act (IS)", fillcolor="#FEF3C7", color="#D97706"];
+    mb1 [label="SRAM Bank 1\n[Streaming Inputs]\nAct (WS) / Q·K (OS)", fillcolor="#FEF3C7", color="#D97706"];
+    mb2 [label="SRAM Bank 2\n[Output Buffers]\nAcc Drain (WS/OS/IS)", fillcolor="#FEF3C7", color="#D97706"];
+    mb3 [label="SRAM Bank 3\n[Standby Reserve]", fillcolor="#FEF3C7", color="#D97706"];
+  }
+
+  mb0 -> full_array [label=" din_n / stat", color="#D97706"];
+  mb1 -> full_array [label=" din_w (stream)", color="#D97706"];
+  full_array -> mb2 [label=" dout (results)", color="#D97706"];
+
+  note_limitation [label="Single-Tenant Limitation:\nMulti-model workloads must queue serially.\nSmaller models underutilize the 16x16 array.",
+                   shape=note, fillcolor="#FEF2F2", color="#DC2626", fontcolor="#991B1B", fontsize=9];
+  note_limitation -> host_ctrl [style=dashed, arrowhead=none, color="#DC2626"];
 }
