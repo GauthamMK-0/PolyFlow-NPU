@@ -10,7 +10,7 @@ cd "$ROOT_DIR"
 SIM_TOOL="${1:-verilator}" # Default to verilator, or pass "iverilog"
 
 echo "=================================================================="
-echo " [DRDS-NPU] Running Complete Architectural Exploration Testsuite"
+echo " [PolyFlow-NPU] Running Complete Architectural Exploration Testsuite"
 echo " Simulation Tool: $SIM_TOOL"
 echo "=================================================================="
 
@@ -44,7 +44,7 @@ run_model_2() {
 }
 
 run_model_3() {
-    echo -e "\n>>> [MODEL 3] Heterogeneous Fission (DRDS-NPU / Novel Proposed) <<<"
+    echo -e "\n>>> [MODEL 3] Heterogeneous Fission (PolyFlow-NPU / Novel Proposed) <<<"
     cd "$ROOT_DIR/models/heterogeneous_fission"
     if [ "$SIM_TOOL" = "verilator" ]; then
         verilator --binary --timing -Wall -Wno-fatal -Wno-DECLFILENAME -Wno-TIMESCALEMOD \

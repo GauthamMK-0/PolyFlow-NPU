@@ -1,4 +1,4 @@
-// hdf_pe.v — Heterogeneous Processing Element for DRDS-NPU / HDF-NPU
+// hdf_pe.v — Heterogeneous Processing Element for PolyFlow-NPU
 // Supports runtime WS / OS / IS switching, lifetime drain counter, and bank stale handshakes.
 
 `timescale 1ns/1ps

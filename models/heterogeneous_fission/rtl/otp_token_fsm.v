@@ -1,4 +1,4 @@
-// otp_token_fsm.v — Single-Writer Ownership Token Protocol for DRDS-NPU / HDF-NPU
+// otp_token_fsm.v — Single-Writer Ownership Token Protocol for PolyFlow-NPU
 // Decentralizes bank reconfiguration handshakes and guarantees mutual exclusion across regions.
 
 `timescale 1ns/1ps

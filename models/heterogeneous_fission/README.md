@@ -1,7 +1,7 @@
-# Model 3: Heterogeneous-Dataflow Fissionable Systolic Array (DRDS-NPU / HDF-NPU)
+# Model 3: Heterogeneous-Dataflow Fissionable Systolic Array (PolyFlow-NPU)
 
 ## Overview
-This directory contains our **Novel Proposed Architecture** (corresponding to **Configuration C** in `evaluation_framework.md`).
+This directory contains our **Novel Proposed Architecture** (PolyFlow-NPU / Configuration C).
 
 ### Key Innovations
 1. **Concurrent Spatial Multi-Tenancy:** The systolic array dynamically divides into independent execution regions (Region A and Region B) at dispatch time via `cfg_split_col`.

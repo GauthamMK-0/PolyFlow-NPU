@@ -1,4 +1,4 @@
-// pod_bank_scrub.v — 4-Cycle Mandatory Zeroing Scrub Controller for DRDS-NPU / HDF-NPU
+// pod_bank_scrub.v — 4-Cycle Mandatory Zeroing Scrub Controller for PolyFlow-NPU
 // Zeroes residual operand data during bank role transitions before emitting bank_role_clear.
 
 `timescale 1ns/1ps

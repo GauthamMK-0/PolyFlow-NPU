@@ -1,4 +1,4 @@
-// hdf_fission_decoder.v — Dynamic Column Partitioning Decoder for DRDS-NPU / HDF-NPU
+// hdf_fission_decoder.v — Dynamic Column Partitioning Decoder for PolyFlow-NPU
 // Partitions PE array into independent regions at dispatch time.
 
 `timescale 1ns/1ps

@@ -1,5 +1,5 @@
-# DRDS-NPU: Dual-Region Dataflow-Switchable Systolic Array
-### *Heterogeneous-Dataflow Fissionable Systolic Array Architecture (HDF-NPU)*
+# PolyFlow-NPU: Polymorphic-Dataflow Fissionable Systolic Array
+### *Concurrent Multi-Tenant Architecture with Independent Per-Region Dataflows*
 
 [![Simulation](https://img.shields.io/badge/Simulation-Verilator%20%7C%20Icarus%20Verilog-brightgreen.svg)]()
 [![Lint](https://img.shields.io/badge/Verilator%20Lint-0%20Errors%20%7C%200%20Warnings-blue.svg)]()
@@ -16,9 +16,9 @@ Prior deep learning accelerators force a mutually exclusive architectural compro
 1. **Homogeneous Spatial Fission (e.g., Planaria, MICRO'20):** Dynamically partitions the physical systolic array into sub-arrays for concurrent multi-tenancy, but **locks all partitions to a single, rigid dataflow—predominantly Weight-Stationary (WS)**. When a partition executes a Transformer Self-Attention layer ($Q \cdot K^T$), it suffers severe energy and memory traffic overhead because WS is mathematically ill-suited for transient activation-activation multiplications.
 2. **Single-Tenant Dataflow Switching (e.g., ReDas, IEEE TC'24):** Allows runtime switching across Weight-Stationary (WS), Output-Stationary (OS), and Input-Stationary (IS), but **operates exclusively on a single tenant across the entire physical array**. Multi-model workloads must queue serially, causing Head-of-Line (HoL) blocking and poor hardware utilization on small-to-medium models.
 
-### Our Solution: Heterogeneous Fission (DRDS-NPU / HDF-NPU)
-DRDS-NPU unifies both paradigms for the first time:
-$$\textbf{Heterogeneous Fission} = \textbf{Concurrent Spatial Multi-Tenancy} + \textbf{Independent Per-Region Runtime Dataflow Selection}$$
+### Our Solution: Heterogeneous Fission (PolyFlow-NPU)
+PolyFlow-NPU unifies both paradigms for the first time:
+$$\textbf{PolyFlow-NPU} = \textbf{Concurrent Spatial Multi-Tenancy} + \textbf{Independent Per-Region Polymorphic Dataflow Selection}$$
 
 Each dynamically partitioned region independently selects its mathematically optimal dataflow at runtime:
 - **Region A:** Executes a CNN backbone (ResNet/ConvNeXt) in **Weight-Stationary (WS)** mode.
@@ -62,7 +62,7 @@ mt_npu/
 │   │   ├── architecture.md               # Detailed microarchitecture specification
 │   │   └── README.md                     # Build and execution guide
 │   │
-│   └── heterogeneous_fission/            # [Model 3] Novel Heterogeneous Fission (DRDS-NPU)
+│   └── heterogeneous_fission/            # [Model 3] Novel Heterogeneous Fission (PolyFlow-NPU)
 │       ├── rtl/                          # Hardware RTL (hdf_pe, hdf_array_grid, hdf_fission_dec, etc.)
 │       ├── tb/                           # Standalone SystemVerilog testbench (hdf_top_tb.v)
 │       ├── architecture.md               # Detailed microarchitecture specification
@@ -151,7 +151,7 @@ verilator --binary --timing -Wall rtl/*.v tb/dfs_top_tb.v --top-module dfs_top_t
 cd models/spatial_fission
 verilator --binary --timing -Wall rtl/*.v tb/sfa_top_tb.v --top-module sfa_top_tb -o Vsfa_top_tb && ./obj_dir/Vsfa_top_tb
 
-# Model 3: Heterogeneous Fission
+# Model 3: Heterogeneous Fission (PolyFlow-NPU)
 cd models/heterogeneous_fission
 verilator --binary --timing -Wall rtl/*.v tb/hdf_top_tb.v --top-module hdf_top_tb -o Vhdf_top_tb && ./obj_dir/Vhdf_top_tb
 ```
@@ -169,7 +169,7 @@ All RTL modules and testbenches are validated with **0 errors and 0 warnings** u
 
 ```
 ==================================================================
- [DRDS-NPU] Complete Architectural Exploration Testsuite Results
+ [PolyFlow-NPU] Complete Architectural Exploration Testsuite Results
 ==================================================================
 >>> [MODEL 1] Dataflow Switching    : PASS (WS: 60, OS: 55, IS: 72)
 >>> [MODEL 2] Spatial Fission       : PASS (Reg A: 60, Reg B: 56, Zero Leakage)

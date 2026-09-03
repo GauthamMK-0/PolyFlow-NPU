@@ -1,4 +1,4 @@
-# Architecture Specification: Novel Heterogeneous Fission Model (Model 3)
+# Architecture Specification: Novel Heterogeneous Fission Model (PolyFlow-NPU)
 
 > **Intuitive Summary:**
 > Think of this model like an advanced dual-lane highway where two vehicles travel side-by-side. Not only are the lanes safely divided by a crash barrier, but **each lane allows a completely different type of vehicle optimized for its own mission**: Lane 1 carries a heavy cargo truck in 4th gear (a CNN in Weight-Stationary mode), while Lane 2 carries a high-speed electric car (Transformer Attention in Output-Stationary mode). They share the roadway with zero traffic jams and zero collisions.
@@ -11,9 +11,9 @@ Prior accelerators forced a painful trade-off:
 - **Model 1 (Dataflow Switching):** Can switch between WS, OS, and IS, but **only for one tenant at a time**. Multi-model systems suffer severe queue delays.
 - **Model 2 (Spatial Fission):** Can run multiple tenants concurrently, but **all tenants are locked to Weight-Stationary**. Running a modern Transformer Attention layer on WS wastes enormous energy.
 
-**Our Proposed Novelty (DRDS-NPU / HDF-NPU):**
-Model 3 composed both ideas for the first time:
-$$\textbf{Heterogeneous Fission} = \textbf{Spatial Fission} + \textbf{Independent Per-Region Dataflow Selection}$$
+**Our Proposed Novelty (PolyFlow-NPU):**
+Model 3 composes both ideas for the first time:
+$$\textbf{PolyFlow-NPU} = \textbf{Concurrent Spatial Fission} + \textbf{Independent Per-Region Polymorphic Dataflow Selection}$$
 
 Each partitioned region independently chooses its optimal dataflow at runtime:
 - **Region A:** Executes a CNN backbone (ResNet/ConvNeXt) in **Weight-Stationary (WS)** mode.
@@ -88,7 +88,7 @@ Both calculations finish with 100% mathematical precision on the exact same cloc
 
 ## 4. Architectural Comparison Across All Three Models
 
-| Feature | Model 1 (Dataflow Switching) | Model 2 (Spatial Fission) | Model 3 (Novel Heterogeneous Fission) |
+| Feature | Model 1 (Dataflow Switching) | Model 2 (Spatial Fission) | Model 3 (PolyFlow-NPU) |
 |---|:---:|:---:|:---:|
 | **Multi-Tenancy** | Single Tenant Only | Multi-Tenant | **Multi-Tenant** |
 | **Per-Region Dataflow** | Uniform Full-Array | Locked to Weight-Stationary | **Independent Runtime Choice (WS/OS/IS)** |
