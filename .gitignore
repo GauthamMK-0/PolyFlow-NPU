@@ -9,3 +9,6 @@ obj_dir/
 dump.vcd
 tb/dumps/
 scratch/
+
+# Local reference and working files
+local/
