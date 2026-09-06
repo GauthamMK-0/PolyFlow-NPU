@@ -43,12 +43,12 @@ To isolate, evaluate, and benchmark each contribution systematically, this repos
 
 ```
 mt_npu/
-├── figures/                              # Publication-grade architectural diagrams
-│   ├── polyflow_arch.tex (.pdf, .png, .svg) # Master TikZ architecture diagram (vector & 300 dpi)
-│   ├── fig0_comparison.dot (.png, .svg)  # Side-by-side taxonomy & comparative matrix
-│   ├── figA_homo_fission.dot (.png, .svg)# Configuration A: Homogeneous Fission Pod
-│   ├── figB_seq_switch.dot (.png, .svg)  # Configuration B: Sequential Dataflow Switching Pod
-│   └── figC_hetero_fission.dot (.png, .svg)# Configuration C: Proposed Heterogeneous Fission Pod
+├── figures/                              # Publication-grade architectural diagrams (PNG)
+│   ├── polyflow_arch.png                 # Master PolyFlow-NPU architecture diagram (300 dpi)
+│   ├── fig0_comparison.png               # Side-by-side taxonomy & comparative matrix
+│   ├── figA_homo_fission.png             # Configuration A: Homogeneous Fission Pod
+│   ├── figB_seq_switch.png               # Configuration B: Sequential Dataflow Switching Pod
+│   └── figC_hetero_fission.png           # Configuration C: Heterogeneous Fission Pod
 │
 ├── models/                               # Self-contained architectural models
 │   ├── dataflow_switching/               # [Model 1] Single-tenant runtime switching
@@ -70,7 +70,6 @@ mt_npu/
 │       └── README.md                     # Build and execution guide
 │
 ├── scripts/
-│   ├── render_figures.sh                 # Renders all TikZ (.tex) and Graphviz (.dot) figures
 │   └── run_all_models.sh                 # Unified testbench runner for Verilator and Icarus Verilog
 │
 ├── local/                                # Local working references & baseline specs (gitignored)
@@ -159,11 +158,6 @@ verilator --binary --timing -Wall rtl/*.sv tb/sfa_top_tb.sv --top-module sfa_top
 # Model 3: Heterogeneous Fission (PolyFlow-NPU)
 cd models/heterogeneous_fission
 verilator --binary --timing -Wall rtl/*.sv tb/hdf_top_tb.sv --top-module hdf_top_tb -o Vhdf_top_tb && ./obj_dir/Vhdf_top_tb
-```
-
-### Rendering Architecture Figures
-```bash
-./scripts/render_figures.sh
 ```
 
 ---

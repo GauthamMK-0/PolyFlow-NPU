@@ -12,3 +12,11 @@ scratch/
 
 # Local reference and working files
 local/
+
+# TeX source files and intermediate figure build artifacts
+*.tex
+*.pdf
+*.svg
+*.dot
+*.aux
+*.out

@@ -22,6 +22,10 @@ Model 1 introduces **runtime dataflow switching** to a single-tenant array. A si
 1. `2'b00` — **Weight-Stationary (WS):** Weights stay inside PEs; activations stream through. Best for Conv2D & Dense layers.
 2. `2'b01` — **Output-Stationary (OS):** Partial sums accumulate inside PEs; both matrix inputs stream through simultaneously. Best for Transformer Self-Attention ($Q \cdot K^T$).
 3. `2'b10` — **Input-Stationary (IS):** Activations stay inside PEs; filter weights stream through. Best for Depthwise Convolutions.
+ 
+<p align="center">
+  <img src="../../figures/figB_seq_switch.png" alt="Sequential Dataflow Switching Architecture Diagram" width="100%">
+</p>
 
 ---
 
