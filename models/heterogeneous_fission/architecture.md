@@ -46,24 +46,24 @@ Each partitioned region independently chooses its optimal dataflow at runtime:
                          +-------------------------------------+
 ```
 
-### 2.1 The Heterogeneous Processing Element (`hdf_pe.v`)
+### 2.1 The Heterogeneous Processing Element (`hdf_pe.sv`)
 Each PE in Model 3 combines:
 1. **3-Dataflow Multiplexers:** Switches between WS (`mul_a = stat_reg, mul_b = din_w`), OS (`mul_a = din_n, mul_b = din_w`), and IS (`mul_a = stat_reg, mul_b = din_w`) based on the region's dynamic mode.
 2. **In-Flight Lifetime Countdown Register (`lifetime_cnt`):** When regions shift boundaries, in-flight calculations must gracefully drain before new workloads enter. The lifetime counter decrements to 0 and cleanly gates the multiplier.
 3. **Bank Role Stale Flag (`bank_role_stale`):** Prevents PEs from reading un-scrubbed memory banks until the hardware scrub cycle finishes.
 
-### 2.2 2D Mesh with Dynamic Boundary Barrier (`hdf_array_grid.v`)
+### 2.2 2D Mesh with Dynamic Boundary Barrier (`hdf_array_grid.sv`)
 - Slices the physical grid at `cfg_split_col`.
 - Cross-region horizontal wires are zeroed so activations from Region A can never bleed into Region B.
 - Region B receives fresh operands directly via dedicated west input pins (`din_w_region_b`).
 
-### 2.3 EPPA Dynamic Memory Bandwidth Balancing (`eppa_arbiter.v`)
+### 2.3 EPPA Dynamic Memory Bandwidth Balancing (`eppa_arbiter.sv`)
 Because Region A and Region B run different dataflows, their memory access profiles are complementary:
 - Region A (WS) preloads weights, then enters steady compute (memory idle).
 - Region B (OS) continuously streams queries ($Q$) and keys ($K$) from memory.
 - **The EPPA Advantage:** As soon as Region A transitions to compute, EPPA automatically shifts idle memory bandwidth to Region B, eliminating memory bottlenecks without complex clock arbitration!
 
-### 2.4 OTP Token & Mandatory 4-Cycle Zeroing Scrub (`otp_token_fsm.v`, `pod_bank_scrub.v`)
+### 2.4 OTP Token & Mandatory 4-Cycle Zeroing Scrub (`otp_token_fsm.sv`, `pod_bank_scrub.sv`)
 - Decentralized single-writer ownership guarantees race-free memory allocation.
 - When a bank migrates between tenants, a 4-cycle hardware zeroing scrub clears all residual data, provably stopping tenant snooping and data-retention side channels.
 

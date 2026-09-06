@@ -19,11 +19,11 @@ run_model_1() {
     cd "$ROOT_DIR/models/dataflow_switching"
     if [ "$SIM_TOOL" = "verilator" ]; then
         verilator --binary --timing -Wall -Wno-fatal -Wno-DECLFILENAME -Wno-TIMESCALEMOD \
-            rtl/dfs_pe.v rtl/dfs_array.v rtl/dfs_top.v tb/dfs_top_tb.v \
+            rtl/dfs_pe.sv rtl/dfs_array.sv rtl/dfs_top.sv tb/dfs_top_tb.sv \
             --top-module dfs_top_tb -o Vdfs_top_tb > /dev/null
         ./obj_dir/Vdfs_top_tb
     else
-        iverilog -g2012 -o tb/dfs_top_tb.vvp rtl/*.v tb/dfs_top_tb.v
+        iverilog -g2012 -o tb/dfs_top_tb.vvp rtl/*.sv tb/dfs_top_tb.sv
         vvp tb/dfs_top_tb.vvp
     fi
 }
@@ -33,12 +33,12 @@ run_model_2() {
     cd "$ROOT_DIR/models/spatial_fission"
     if [ "$SIM_TOOL" = "verilator" ]; then
         verilator --binary --timing -Wall -Wno-fatal -Wno-DECLFILENAME -Wno-TIMESCALEMOD \
-            rtl/sfa_pe.v rtl/sfa_fission_decoder.v rtl/sfa_array.v \
-            rtl/sfa_otp_fsm.v rtl/sfa_bank_scrub.v rtl/sfa_eppa.v rtl/sfa_top.v \
-            tb/sfa_top_tb.v --top-module sfa_top_tb -o Vsfa_top_tb > /dev/null
+            rtl/sfa_pe.sv rtl/sfa_fission_decoder.sv rtl/sfa_array.sv \
+            rtl/sfa_otp_fsm.sv rtl/sfa_bank_scrub.sv rtl/sfa_eppa.sv rtl/sfa_top.sv \
+            tb/sfa_top_tb.sv --top-module sfa_top_tb -o Vsfa_top_tb > /dev/null
         ./obj_dir/Vsfa_top_tb
     else
-        iverilog -g2012 -o tb/sfa_top_tb.vvp rtl/*.v tb/sfa_top_tb.v
+        iverilog -g2012 -o tb/sfa_top_tb.vvp rtl/*.sv tb/sfa_top_tb.sv
         vvp tb/sfa_top_tb.vvp
     fi
 }
@@ -48,12 +48,12 @@ run_model_3() {
     cd "$ROOT_DIR/models/heterogeneous_fission"
     if [ "$SIM_TOOL" = "verilator" ]; then
         verilator --binary --timing -Wall -Wno-fatal -Wno-DECLFILENAME -Wno-TIMESCALEMOD \
-            rtl/hdf_pe.v rtl/hdf_fission_decoder.v rtl/hdf_array_grid.v \
-            rtl/eppa_arbiter.v rtl/otp_token_fsm.v rtl/pod_bank_scrub.v rtl/hdf_top.v \
-            tb/hdf_top_tb.v --top-module hdf_top_tb -o Vhdf_top_tb > /dev/null
+            rtl/hdf_pe.sv rtl/hdf_fission_decoder.sv rtl/hdf_array_grid.sv \
+            rtl/eppa_arbiter.sv rtl/otp_token_fsm.sv rtl/pod_bank_scrub.sv rtl/hdf_top.sv \
+            tb/hdf_top_tb.sv --top-module hdf_top_tb -o Vhdf_top_tb > /dev/null
         ./obj_dir/Vhdf_top_tb
     else
-        iverilog -g2012 -o tb/hdf_top_tb.vvp rtl/*.v tb/hdf_top_tb.v
+        iverilog -g2012 -o tb/hdf_top_tb.vvp rtl/*.sv tb/hdf_top_tb.sv
         vvp tb/hdf_top_tb.vvp
     fi
 }

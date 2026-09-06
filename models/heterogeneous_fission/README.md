@@ -21,15 +21,15 @@ This directory contains our **Novel Proposed Architecture** (PolyFlow-NPU / Conf
 ```
 models/heterogeneous_fission/
 ├── rtl/
-│   ├── hdf_pe.v              # Heterogeneous PE with WS/OS/IS, lifetime counter, stale flag
-│   ├── hdf_fission_decoder.v # Dynamic column partition decoder
-│   ├── hdf_array_grid.v      # 2D array grid with dynamic boundary isolation
-│   ├── eppa_arbiter.v        # Event-driven phase-pinned bandwidth arbiter
-│   ├── otp_token_fsm.v       # Single-writer ownership token FSM
-│   ├── pod_bank_scrub.v      # 4-cycle zeroing scrub controller
-│   └── hdf_top.v             # Top-level unified heterogeneous fission pod
+│   ├── hdf_pe.sv              # Heterogeneous PE with WS/OS/IS, lifetime counter, stale flag
+│   ├── hdf_fission_decoder.sv # Dynamic column partition decoder
+│   ├── hdf_array_grid.sv      # 2D array grid with dynamic boundary isolation
+│   ├── eppa_arbiter.sv        # Event-driven phase-pinned bandwidth arbiter
+│   ├── otp_token_fsm.sv       # Single-writer ownership token FSM
+│   ├── pod_bank_scrub.sv      # 4-cycle zeroing scrub controller
+│   └── hdf_top.sv             # Top-level unified heterogeneous fission pod
 ├── tb/
-│   └── hdf_top_tb.v          # Standalone SystemVerilog co-execution testbench
+│   └── hdf_top_tb.sv          # Standalone SystemVerilog co-execution testbench
 └── README.md
 ```
 
@@ -41,15 +41,15 @@ models/heterogeneous_fission/
 ```bash
 cd models/heterogeneous_fission
 verilator --binary --timing -Wall -Wno-fatal -Wno-DECLFILENAME \
-    rtl/hdf_pe.v rtl/hdf_fission_decoder.v rtl/hdf_array_grid.v \
-    rtl/eppa_arbiter.v rtl/otp_token_fsm.v rtl/pod_bank_scrub.v rtl/hdf_top.v \
-    tb/hdf_top_tb.v --top-module hdf_top_tb -o Vhdf_top_tb
+    rtl/hdf_pe.sv rtl/hdf_fission_decoder.sv rtl/hdf_array_grid.sv \
+    rtl/eppa_arbiter.sv rtl/otp_token_fsm.sv rtl/pod_bank_scrub.sv rtl/hdf_top.sv \
+    tb/hdf_top_tb.sv --top-module hdf_top_tb -o Vhdf_top_tb
 ./obj_dir/Vhdf_top_tb
 ```
 
 ### Using Icarus Verilog (Alternative)
 ```bash
 cd models/heterogeneous_fission
-iverilog -g2012 -o tb/hdf_top_tb.vvp rtl/*.v tb/hdf_top_tb.v
+iverilog -g2012 -o tb/hdf_top_tb.vvp rtl/*.sv tb/hdf_top_tb.sv
 vvp tb/hdf_top_tb.vvp
 ```

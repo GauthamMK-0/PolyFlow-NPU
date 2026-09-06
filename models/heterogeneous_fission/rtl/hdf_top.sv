@@ -1,4 +1,4 @@
-// hdf_top.v — Top-Level Pod for Heterogeneous Fission Architecture (PolyFlow-NPU)
+// hdf_top.sv — Top-Level Pod for Heterogeneous Fission Architecture (PolyFlow-NPU)
 // Unifies spatial multi-tenancy with independent per-region dataflow switching (WS / OS / IS).
 
 `timescale 1ns/1ps

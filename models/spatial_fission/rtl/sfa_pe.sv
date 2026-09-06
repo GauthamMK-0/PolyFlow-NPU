@@ -1,4 +1,4 @@
-// sfa_pe.v — Processing Element for Homogeneous Spatial Fission Model
+// sfa_pe.sv — Processing Element for Homogeneous Spatial Fission Model
 // Pinned to Weight-Stationary (WS) dataflow (Planaria-style architecture).
 
 `timescale 1ns/1ps

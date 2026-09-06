@@ -1,4 +1,4 @@
-// dfs_top.v — Top-Level Controller for Single-Tenant Dataflow Switching
+// dfs_top.sv — Top-Level Controller for Single-Tenant Dataflow Switching
 // Coordinates full-array execution of sequential deep learning tiles (WS / OS / IS).
 
 `timescale 1ns/1ps

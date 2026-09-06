@@ -1,4 +1,4 @@
-// eppa_arbiter.v — Event-Driven Phase-Pinned Arbiter for PolyFlow-NPU
+// eppa_arbiter.sv — Event-Driven Phase-Pinned Arbiter for PolyFlow-NPU
 // Arbitrates shared memory bandwidth on phase transitions and pins quasi-statically during steady state.
 
 `timescale 1ns/1ps

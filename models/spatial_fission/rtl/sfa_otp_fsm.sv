@@ -1,4 +1,4 @@
-// sfa_otp_fsm.v — Single-Writer Ownership Token Protocol for Shared Memory Banks
+// sfa_otp_fsm.sv — Single-Writer Ownership Token Protocol for Shared Memory Banks
 // Guarantees race-free bank ownership with rotating epoch priority.
 
 `timescale 1ns/1ps

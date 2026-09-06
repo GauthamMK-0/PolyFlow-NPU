@@ -1,4 +1,4 @@
-// sfa_eppa.v — Event-Driven Phase-Pinned Arbiter for Spatial Fission
+// sfa_eppa.sv — Event-Driven Phase-Pinned Arbiter for Spatial Fission
 // Allocates shared memory bandwidth based on regional phase tags (Burst, Idle, Stream, Reconfig).
 
 `timescale 1ns/1ps

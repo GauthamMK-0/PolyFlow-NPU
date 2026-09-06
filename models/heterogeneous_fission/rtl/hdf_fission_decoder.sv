@@ -1,9 +1,9 @@
-// sfa_fission_decoder.v — Dynamic Column Partitioning Decoder for Spatial Fission
-// Maps cfg_split_col into region_id_mask (0=Region A, 1=Region B) and generates reassign pulses.
+// hdf_fission_decoder.sv — Dynamic Column Partitioning Decoder for PolyFlow-NPU
+// Partitions PE array into independent regions at dispatch time.
 
 `timescale 1ns/1ps
 
-module sfa_fission_decoder #(
+module hdf_fission_decoder #(
     parameter int NUM_COLS = 4
 ) (
     input  logic                 clk,
@@ -28,7 +28,7 @@ module sfa_fission_decoder #(
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            // Default: symmetric split (first half to Region A, second half to Region B)
+            // Default: symmetric split
             region_id_mask      <= '0;
             region_reassign_bus <= '0;
             for (int c = 0; c < NUM_COLS; c++) begin

@@ -19,7 +19,7 @@ Model 2 introduces **Spatial Fission** (following the architecture of prior rese
 
 ## 2. Dynamic Column Slicing & Boundary Isolation
 
-### 2.1 The Fission Decoder (`sfa_fission_decoder.v`)
+### 2.1 The Fission Decoder (`sfa_fission_decoder.sv`)
 At dispatch time, the host controller sends a split column index `cfg_split_col` (e.g., `4'd2` on a 4-column array):
 - Columns $c < 2$ (Cols 0 and 1) are marked as **Region A** (`region_id_mask = 0`).
 - Columns $c \ge 2$ (Cols 2 and 3) are marked as **Region B** (`region_id_mask = 1`).
@@ -37,7 +37,7 @@ At dispatch time, the host controller sends a split column index `cfg_split_col`
                (Cross-Wires Zeroed)
 ```
 
-### 2.2 Hardware Boundary Isolation (`sfa_array.v`)
+### 2.2 Hardware Boundary Isolation (`sfa_array.sv`)
 In a normal systolic array, PE outputs pass combinationally from left to right. If left untreated, activations from Region A would leak right into Region B and corrupt its calculations.
 
 To prevent this, the boundary PE at column `cfg_split_col` severs the connection from the left and routes to a dedicated input pin (`din_w_region_b`):
@@ -50,17 +50,17 @@ This provides **electrical isolation**: Region A and Region B run completely ind
 
 When multiple tenants share an accelerator chip, they share the on-chip memory banks. Model 2 includes three dedicated hardware safety engines:
 
-### 3.1 EPPA Bandwidth Arbiter (`sfa_eppa.v`)
+### 3.1 EPPA Bandwidth Arbiter (`sfa_eppa.sv`)
 To avoid memory bandwidth contention, the Event-Driven Phase-Pinned Arbiter monitors execution phases:
 - `PH_BURST` (`2'b00`): Region is preloading weights $\to$ gets **100% memory bandwidth (`0xFF`)**.
 - `PH_STREAM` (`2'b10`): Region is streaming activations $\to$ gets **50% balanced bandwidth (`0x7F`)**.
 - `PH_IDLE` (`2'b01`): Region is waiting $\to$ gets **0% bandwidth (`0x00`)**.
 Bandwidth is updated only during phase transitions and stays pinned during compute, keeping the clock path fast.
 
-### 3.2 OTP Token Protocol (`sfa_otp_fsm.v`)
+### 3.2 OTP Token Protocol (`sfa_otp_fsm.sv`)
 To prevent two regions from modifying the same memory bank simultaneously, banks use a Single-Writer Ownership Token. A rotating epoch counter rotates priority between Region A and Region B so neither tenant is ever starved.
 
-### 3.3 Mandatory 4-Cycle Bank Scrubbing (`sfa_bank_scrub.v`)
+### 3.3 Mandatory 4-Cycle Bank Scrubbing (`sfa_bank_scrub.sv`)
 When a memory bank is transferred from Region A to Region B, there is a risk that Region B could read residual sensitive weights from Region A (a data retention security attack).
 - The hardware enforces a **mandatory 4-cycle zeroing scrub**.
 - The bank is actively overwritten with zeroes before `bank_role_clear` is signaled to Region B.

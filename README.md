@@ -52,19 +52,19 @@ mt_npu/
 ├── models/                               # Self-contained architectural models
 │   ├── dataflow_switching/               # [Model 1] Single-tenant runtime switching
 │   │   ├── rtl/                          # Hardware RTL (dfs_pe, dfs_array, dfs_top)
-│   │   ├── tb/                           # Standalone SystemVerilog testbench (dfs_top_tb.v)
+│   │   ├── tb/                           # Standalone SystemVerilog testbench (dfs_top_tb.sv)
 │   │   ├── architecture.md               # Detailed microarchitecture specification
 │   │   └── README.md                     # Build and execution guide
 │   │
 │   ├── spatial_fission/                  # [Model 2] Homogeneous spatial multi-tenancy
 │   │   ├── rtl/                          # Hardware RTL (sfa_pe, sfa_array, sfa_fission_dec, sfa_eppa, etc.)
-│   │   ├── tb/                           # Standalone SystemVerilog testbench (sfa_top_tb.v)
+│   │   ├── tb/                           # Standalone SystemVerilog testbench (sfa_top_tb.sv)
 │   │   ├── architecture.md               # Detailed microarchitecture specification
 │   │   └── README.md                     # Build and execution guide
 │   │
 │   └── heterogeneous_fission/            # [Model 3] Novel Heterogeneous Fission (PolyFlow-NPU)
 │       ├── rtl/                          # Hardware RTL (hdf_pe, hdf_array_grid, hdf_fission_dec, etc.)
-│       ├── tb/                           # Standalone SystemVerilog testbench (hdf_top_tb.v)
+│       ├── tb/                           # Standalone SystemVerilog testbench (hdf_top_tb.sv)
 │       ├── architecture.md               # Detailed microarchitecture specification
 │       └── README.md                     # Build and execution guide
 │
@@ -116,10 +116,10 @@ mt_npu/
                           +-----------------------------------------+
 ```
 
-1. **Heterogeneous PE (`hdf_pe.v`):** Unifies 3-way runtime operand multiplexing (WS/OS/IS) with an in-flight **lifetime countdown counter** (`lifetime_cnt`) that gracefully drains partial sums during partition re-sizing, and a **bank role stale flag** (`bank_role_stale`) protecting against stale memory reads.
-2. **Dynamic Boundary Barrier (`hdf_array_grid.v`):** Slices the 2D mesh at `cfg_split_col`. Wires crossing the boundary are actively zeroed to guarantee **provable zero cross-talk** between tenants.
-3. **Event-Driven Phase-Pinned Arbiter (EPPA, `eppa_arbiter.v`):** Reallocates memory bandwidth upon phase transitions (`BURST`, `STREAM`, `IDLE`, `RECONFIG`). When Region A enters steady-state compute, its idle bandwidth automatically shifts to Region B's streaming query/key buffers.
-4. **Decentralized Single-Writer Tokens (OTP, `otp_token_fsm.v`) & 4-Cycle Scrub (`pod_bank_scrub.v`):** Epoch-rotating priority guarantees starvation-free memory access, while a mandatory 4-cycle hardware zeroing scrub wipes residual tenant weights before memory release, eliminating side-channel data-retention attacks.
+1. **Heterogeneous PE (`hdf_pe.sv`):** Unifies 3-way runtime operand multiplexing (WS/OS/IS) with an in-flight **lifetime countdown counter** (`lifetime_cnt`) that gracefully drains partial sums during partition re-sizing, and a **bank role stale flag** (`bank_role_stale`) protecting against stale memory reads.
+2. **Dynamic Boundary Barrier (`hdf_array_grid.sv`):** Slices the 2D mesh at `cfg_split_col`. Wires crossing the boundary are actively zeroed to guarantee **provable zero cross-talk** between tenants.
+3. **Event-Driven Phase-Pinned Arbiter (EPPA, `eppa_arbiter.sv`):** Reallocates memory bandwidth upon phase transitions (`BURST`, `STREAM`, `IDLE`, `RECONFIG`). When Region A enters steady-state compute, its idle bandwidth automatically shifts to Region B's streaming query/key buffers.
+4. **Decentralized Single-Writer Tokens (OTP, `otp_token_fsm.sv`) & 4-Cycle Scrub (`pod_bank_scrub.sv`):** Epoch-rotating priority guarantees starvation-free memory access, while a mandatory 4-cycle hardware zeroing scrub wipes residual tenant weights before memory release, eliminating side-channel data-retention attacks.
 
 ---
 
@@ -145,15 +145,15 @@ To execute the automated simulation testsuite across all three architectural mod
 ```bash
 # Model 1: Dataflow Switching
 cd models/dataflow_switching
-verilator --binary --timing -Wall rtl/*.v tb/dfs_top_tb.v --top-module dfs_top_tb -o Vdfs_top_tb && ./obj_dir/Vdfs_top_tb
+verilator --binary --timing -Wall rtl/*.sv tb/dfs_top_tb.sv --top-module dfs_top_tb -o Vdfs_top_tb && ./obj_dir/Vdfs_top_tb
 
 # Model 2: Spatial Fission
 cd models/spatial_fission
-verilator --binary --timing -Wall rtl/*.v tb/sfa_top_tb.v --top-module sfa_top_tb -o Vsfa_top_tb && ./obj_dir/Vsfa_top_tb
+verilator --binary --timing -Wall rtl/*.sv tb/sfa_top_tb.sv --top-module sfa_top_tb -o Vsfa_top_tb && ./obj_dir/Vsfa_top_tb
 
 # Model 3: Heterogeneous Fission (PolyFlow-NPU)
 cd models/heterogeneous_fission
-verilator --binary --timing -Wall rtl/*.v tb/hdf_top_tb.v --top-module hdf_top_tb -o Vhdf_top_tb && ./obj_dir/Vhdf_top_tb
+verilator --binary --timing -Wall rtl/*.sv tb/hdf_top_tb.sv --top-module hdf_top_tb -o Vhdf_top_tb && ./obj_dir/Vhdf_top_tb
 ```
 
 ### Rendering Architecture Figures

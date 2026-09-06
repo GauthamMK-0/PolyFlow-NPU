@@ -1,4 +1,4 @@
-// dfs_array.v — 2D Systolic Array Grid for Single-Tenant Dataflow Switching
+// dfs_array.sv — 2D Systolic Array Grid for Single-Tenant Dataflow Switching
 // Interconnects PEs in a clean 2D mesh (North->South and West->East).
 
 `timescale 1ns/1ps

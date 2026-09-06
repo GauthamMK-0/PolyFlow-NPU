@@ -18,15 +18,15 @@ This directory contains the standalone **Spatial Fission Model** (corresponding 
 ```
 models/spatial_fission/
 ├── rtl/
-│   ├── sfa_pe.v              # Processing element pinned to Weight-Stationary
-│   ├── sfa_fission_decoder.v # Dynamic column split decoder
-│   ├── sfa_array.v           # 2D systolic array with hardware boundary isolation
-│   ├── sfa_otp_fsm.v         # Single-writer ownership token FSM
-│   ├── sfa_bank_scrub.v      # 4-cycle zeroing scrub controller
-│   ├── sfa_eppa.v            # Event-driven phase-pinned bandwidth arbiter
-│   └── sfa_top.v             # Top-level multi-tenant pod
+│   ├── sfa_pe.sv              # Processing element pinned to Weight-Stationary
+│   ├── sfa_fission_decoder.sv # Dynamic column split decoder
+│   ├── sfa_array.sv           # 2D systolic array with hardware boundary isolation
+│   ├── sfa_otp_fsm.sv         # Single-writer ownership token FSM
+│   ├── sfa_bank_scrub.sv      # 4-cycle zeroing scrub controller
+│   ├── sfa_eppa.sv            # Event-driven phase-pinned bandwidth arbiter
+│   └── sfa_top.sv             # Top-level multi-tenant pod
 ├── tb/
-│   └── sfa_top_tb.v          # Standalone SystemVerilog testbench
+│   └── sfa_top_tb.sv          # Standalone SystemVerilog testbench
 └── README.md
 ```
 
@@ -38,15 +38,15 @@ models/spatial_fission/
 ```bash
 cd models/spatial_fission
 verilator --binary --timing -Wall -Wno-fatal -Wno-DECLFILENAME \
-    rtl/sfa_pe.v rtl/sfa_fission_decoder.v rtl/sfa_array.v \
-    rtl/sfa_otp_fsm.v rtl/sfa_bank_scrub.v rtl/sfa_eppa.v rtl/sfa_top.v \
-    tb/sfa_top_tb.v --top-module sfa_top_tb -o Vsfa_top_tb
+    rtl/sfa_pe.sv rtl/sfa_fission_decoder.sv rtl/sfa_array.sv \
+    rtl/sfa_otp_fsm.sv rtl/sfa_bank_scrub.sv rtl/sfa_eppa.sv rtl/sfa_top.sv \
+    tb/sfa_top_tb.sv --top-module sfa_top_tb -o Vsfa_top_tb
 ./obj_dir/Vsfa_top_tb
 ```
 
 ### Using Icarus Verilog (Alternative)
 ```bash
 cd models/spatial_fission
-iverilog -g2012 -o tb/sfa_top_tb.vvp rtl/*.v tb/sfa_top_tb.v
+iverilog -g2012 -o tb/sfa_top_tb.vvp rtl/*.sv tb/sfa_top_tb.sv
 vvp tb/sfa_top_tb.vvp
 ```

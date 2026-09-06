@@ -27,7 +27,7 @@ Model 1 introduces **runtime dataflow switching** to a single-tenant array. A si
 
 ## 2. Processing Element (PE) Microarchitecture
 
-Inside each PE (`dfs_pe.v`), there is an arithmetic datapath with two input multiplexers:
+Inside each PE (`dfs_pe.sv`), there is an arithmetic datapath with two input multiplexers:
 
 ```
                             [din_n (North Input)]
@@ -59,7 +59,7 @@ Inside each PE (`dfs_pe.v`), there is an arithmetic datapath with two input mult
 
 ## 3. 2D Systolic Array Microarchitecture
 
-The array module (`dfs_array.v`) connects an $M \times N$ grid of PEs in a clean two-dimensional mesh:
+The array module (`dfs_array.sv`) connects an $M \times N$ grid of PEs in a clean two-dimensional mesh:
 - **North-to-South Channels (`din_n` $\to$ `dout_s`):** Streams column operands downwards.
 - **West-to-East Channels (`din_w` $\to$ `dout_e`):** Streams row operands rightwards.
 - **Single-Tenant Operation:** All rows and columns in the array operate under the **exact same dataflow mode** simultaneously.

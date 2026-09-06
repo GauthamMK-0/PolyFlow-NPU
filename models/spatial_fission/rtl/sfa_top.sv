@@ -1,4 +1,4 @@
-// sfa_top.v — Top-Level Pod for Homogeneous Spatial Fission Architecture
+// sfa_top.sv — Top-Level Pod for Homogeneous Spatial Fission Architecture
 // Integrates 2-region spatial fission with shared memory arbitration, bank tokens, and scrubbing.
 
 `timescale 1ns/1ps

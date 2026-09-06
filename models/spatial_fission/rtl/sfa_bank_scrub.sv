@@ -1,9 +1,9 @@
-// pod_bank_scrub.v — 4-Cycle Mandatory Zeroing Scrub Controller for PolyFlow-NPU
-// Zeroes residual operand data during bank role transitions before emitting bank_role_clear.
+// sfa_bank_scrub.sv — 4-Cycle Mandatory Zeroing Scrub Controller for Shared Memory Banks
+// Prevents cross-tenant data leakage upon memory bank role or owner transitions.
 
 `timescale 1ns/1ps
 
-module pod_bank_scrub #(
+module sfa_bank_scrub #(
     parameter int REGION_W  = 1,
     parameter int SCRUB_CYC = 4
 ) (
@@ -29,7 +29,7 @@ module pod_bank_scrub #(
             bank_role_clear   <= 1'b0;
             scrub_cnt         <= '0;
             region_owner      <= '0;
-            role_tag          <= 2'b11; // 2'b11 = Idle / Scrubbing
+            role_tag          <= 2'b11; // 2'b11 = Idle / Unallocated
             latched_region_id <= '0;
             latched_role      <= 2'b00;
         end else begin

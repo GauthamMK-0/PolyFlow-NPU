@@ -1,4 +1,4 @@
-// sfa_top_tb.v — SystemVerilog Testbench for Homogeneous Spatial Fission Model
+// sfa_top_tb.sv — SystemVerilog Testbench for Homogeneous Spatial Fission Model
 // Validates dynamic spatial fission, boundary isolation, concurrent multi-tenancy, and memory safety.
 
 `timescale 1ns/1ps

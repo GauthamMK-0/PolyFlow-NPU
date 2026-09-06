@@ -1,4 +1,4 @@
-// hdf_top_tb.v — SystemVerilog Testbench for Novel Heterogeneous Fission Model (PolyFlow-NPU)
+// hdf_top_tb.sv — SystemVerilog Testbench for Novel Heterogeneous Fission Model (PolyFlow-NPU)
 // Verifies concurrent multi-tenant execution of CNN (Weight-Stationary) and Transformer Attention (Output-Stationary).
 
 `timescale 1ns/1ps

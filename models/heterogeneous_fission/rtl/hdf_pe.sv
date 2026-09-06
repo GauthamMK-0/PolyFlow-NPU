@@ -1,11 +1,13 @@
-// dfs_pe.v — Processing Element for Single-Tenant Dataflow Switching
-// Supports runtime switching across Weight-Stationary (WS), Output-Stationary (OS), and Input-Stationary (IS).
+// hdf_pe.sv — Heterogeneous Processing Element for PolyFlow-NPU
+// Supports runtime WS / OS / IS switching, lifetime drain counter, and bank stale handshakes.
 
 `timescale 1ns/1ps
 
-module dfs_pe #(
-    parameter int DATA_W = 8,
-    parameter int ACC_W  = 32
+module hdf_pe #(
+    parameter int DATA_W     = 8,
+    parameter int ACC_W      = 32,
+    parameter int LIFETIME_W = 4,
+    parameter int REGION_W   = 1
 ) (
     input  logic                    clk,
     input  logic                    rst_n,
@@ -16,14 +18,27 @@ module dfs_pe #(
     output logic [DATA_W-1:0]       dout_s,
     output logic [DATA_W-1:0]       dout_e,
 
-    // Full precision accumulator output
+    // Full accumulator output
     output logic [ACC_W-1:0]        acc_out,
 
-    // Runtime configuration & control
+    // Runtime dataflow & region configuration
     input  logic [1:0]              dataflow_mode, // 00=WS, 01=OS, 10=IS, 11=RSVD
+    /* verilator lint_off UNUSEDSIGNAL */
+    input  logic [REGION_W-1:0]     region_id,
+    /* verilator lint_on UNUSEDSIGNAL */
+    input  logic                    region_reassign,
+
+    // Lifetime counter (drain window during handover)
+    input  logic                    lifetime_ld,
+    input  logic [LIFETIME_W-1:0]   lifetime_init,
+
+    // Bank safety handshake
+    output logic                    bank_role_stale,
+    input  logic                    bank_role_clear,
+
+    // Execution control
     input  logic                    w_ld,          // Preload stationary operand
-    input  logic                    acc_clr,       // Clear accumulator
-    input  logic                    compute_en     // Gate computation
+    input  logic                    acc_clr        // Clear accumulator
 );
 
     typedef enum logic [1:0] {
@@ -33,16 +48,39 @@ module dfs_pe #(
         DF_RSV = 2'b11
     } dataflow_e;
 
-    logic [DATA_W-1:0] stat_operand_reg;
-    logic [ACC_W-1:0]  mac_acc;
+    logic [DATA_W-1:0]     stat_operand_reg;
+    logic [ACC_W-1:0]      mac_acc;
+    logic [LIFETIME_W-1:0] lifetime_cnt;
+    wire                   lifetime_active = (lifetime_cnt != '0);
+    wire                   mac_en = lifetime_active && !bank_role_stale;
+
+    // Lifetime counter countdown
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            lifetime_cnt <= '0;
+        end else if (lifetime_ld) begin
+            lifetime_cnt <= lifetime_init;
+        end else if (lifetime_cnt != '0) begin
+            lifetime_cnt <= lifetime_cnt - 1'b1;
+        end
+    end
+
+    // Bank role stale handshake
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            bank_role_stale <= 1'b0;
+        end else if (region_reassign) begin
+            bank_role_stale <= 1'b1;
+        end else if (bank_role_clear) begin
+            bank_role_stale <= 1'b0;
+        end
+    end
 
     // Stationary operand preload register
-    // WS: preloads filter weight from West port
-    // IS: preloads input activation from North port
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             stat_operand_reg <= '0;
-        end else if (w_ld) begin
+        end else if (w_ld && !bank_role_stale) begin
             stat_operand_reg <= (dataflow_mode == DF_WS) ? din_w : din_n;
         end
     end
@@ -85,12 +123,12 @@ module dfs_pe #(
             mac_acc <= '0;
         end else if (acc_clr) begin
             mac_acc <= '0;
-        end else if (compute_en) begin
+        end else if (mac_en) begin
             mac_acc <= mac_acc + product_sext;
         end
     end
 
-    // Systolic forward passing (N -> S, W -> E)
+    // Systolic forward passing
     assign dout_s  = din_n;
     assign dout_e  = din_w;
     assign acc_out = mac_acc;

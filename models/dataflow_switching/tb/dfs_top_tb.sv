@@ -1,4 +1,4 @@
-// dfs_top_tb.v — SystemVerilog Testbench for Single-Tenant Dataflow Switching Model
+// dfs_top_tb.sv — SystemVerilog Testbench for Single-Tenant Dataflow Switching Model
 // Verifies sequential execution across WS (Conv/FC), OS (Attention), and IS (Depthwise Conv) modes.
 
 `timescale 1ns/1ps
