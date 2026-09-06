@@ -44,6 +44,7 @@ To isolate, evaluate, and benchmark each contribution systematically, this repos
 ```
 mt_npu/
 ├── figures/                              # Publication-grade architectural diagrams
+│   ├── polyflow_arch.tex (.pdf, .png, .svg) # Master TikZ architecture diagram (vector & 300 dpi)
 │   ├── fig0_comparison.dot (.png, .svg)  # Side-by-side taxonomy & comparative matrix
 │   ├── figA_homo_fission.dot (.png, .svg)# Configuration A: Homogeneous Fission Pod
 │   ├── figB_seq_switch.dot (.png, .svg)  # Configuration B: Sequential Dataflow Switching Pod
@@ -69,7 +70,7 @@ mt_npu/
 │       └── README.md                     # Build and execution guide
 │
 ├── scripts/
-│   ├── render_figures.sh                 # Renders all .dot diagrams to PNG (160 dpi) and SVG
+│   ├── render_figures.sh                 # Renders all TikZ (.tex) and Graphviz (.dot) figures
 │   └── run_all_models.sh                 # Unified testbench runner for Verilator and Icarus Verilog
 │
 ├── local/                                # Local working references & baseline specs (gitignored)
@@ -86,6 +87,10 @@ mt_npu/
 ---
 
 ## 4. Key Hardware Subsystems & Invariants
+
+<p align="center">
+  <img src="figures/polyflow_arch.png" alt="PolyFlow-NPU Microarchitecture Diagram" width="100%">
+</p>
 
 ```
                                +------------------------------------+

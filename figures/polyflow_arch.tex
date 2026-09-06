@@ -1,0 +1,295 @@
+\documentclass[tikz,border=20pt]{standalone}
+\usepackage{tikz}
+\usepackage{amsmath,amssymb}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,shapes.misc,fit,backgrounds,calc,shadows,decorations.pathreplacing}
+
+% ==============================================================================
+% Color Palette Definitions (Publication-grade IEEE/ACM aesthetic)
+% ==============================================================================
+\definecolor{primaryA}{HTML}{0284C7}     % Sky Blue (Region A / WS / CNN)
+\definecolor{primaryAbg}{HTML}{E0F2FE}   % Light Sky Blue
+\definecolor{primaryAdark}{HTML}{0369A1} % Dark Blue
+
+\definecolor{primaryB}{HTML}{D97706}     % Amber / Orange (Region B / OS / Attention)
+\definecolor{primaryBbg}{HTML}{FEF3C7}   % Light Amber
+\definecolor{primaryBdark}{HTML}{B45309} % Dark Amber
+
+\definecolor{barrierCol}{HTML}{DC2626}   % Crimson Red (Dynamic Barrier)
+\definecolor{barrierBg}{HTML}{FEE2E2}    % Soft Red
+\definecolor{barrierDark}{HTML}{991B1B}  % Deep Crimson
+
+\definecolor{memCol}{HTML}{4F46E5}       % Indigo (Memory & EPPA)
+\definecolor{memBg}{HTML}{EEF2FF}        % Light Indigo
+\definecolor{memDark}{HTML}{312E81}      % Dark Indigo
+
+\definecolor{secCol}{HTML}{BE123C}       % Deep Rose / Maroon (Security OTP / Scrub)
+\definecolor{secBg}{HTML}{FFE4E6}        % Light Rose
+\definecolor{secDark}{HTML}{881337}      % Dark Maroon
+
+\definecolor{panelBg}{HTML}{F8FAFC}      % Canvas Slate White
+\definecolor{cardBorder}{HTML}{CBD5E1}   % Light Cool Grey Border
+\definecolor{titleText}{HTML}{0F172A}    % Dark Slate Navy
+
+\begin{document}
+\begin{tikzpicture}[
+    font=\sffamily,
+    >=Stealth,
+    node distance=0.8cm,
+    every node/.style={align=center},
+    card/.style={
+        draw=cardBorder,
+        fill=white,
+        rounded corners=6pt,
+        line width=1.0pt,
+        drop shadow={opacity=0.08, shadow xshift=2.0pt, shadow yshift=-2.0pt}
+    },
+    peA/.style={
+        draw=primaryA,
+        fill=primaryAbg!85,
+        rounded corners=4pt,
+        line width=1.0pt,
+        minimum width=1.22cm,
+        minimum height=1.05cm,
+        font=\fontsize{7.5}{9}\selectfont\bfseries
+    },
+    peB/.style={
+        draw=primaryB,
+        fill=primaryBbg!85,
+        rounded corners=4pt,
+        line width=1.0pt,
+        minimum width=1.22cm,
+        minimum height=1.05cm,
+        font=\fontsize{7.5}{9}\selectfont\bfseries
+    },
+    bankA/.style={
+        draw=primaryA,
+        fill=primaryAbg!70,
+        rounded corners=4pt,
+        line width=1.0pt,
+        minimum width=2.45cm,
+        minimum height=0.92cm,
+        font=\fontsize{8}{9.5}\selectfont\bfseries
+    },
+    bankB/.style={
+        draw=primaryB,
+        fill=primaryBbg!70,
+        rounded corners=4pt,
+        line width=1.0pt,
+        minimum width=2.45cm,
+        minimum height=0.92cm,
+        font=\fontsize{8}{9.5}\selectfont\bfseries
+    }
+]
+
+  % ============================================================================
+  % TITLE BANNER
+  % ============================================================================
+  \node[inner sep=0pt] (title) at (10.0, 16.2) {
+      {\fontsize{19}{23}\selectfont\bfseries\color{titleText} PolyFlow-NPU Microarchitecture}\\[4pt]
+      {\fontsize{11}{14}\selectfont\color{titleText!75} Polymorphic-Dataflow Fissionable Systolic Array with Hardware Multi-Tenant Isolation ($\text{WS} \parallel \text{OS}$)}
+  };
+
+  % ============================================================================
+  % LAYER 1: MULTI-TENANT HOST SCHEDULER & DYNAMIC FISSION DECODER
+  % ============================================================================
+  \node[card, fill=panelBg, minimum width=19.6cm, minimum height=2.2cm] (disp_box) at (10.0, 14.1) {};
+  \node[anchor=north west, font=\fontsize{9.5}{11}\selectfont\bfseries\color{titleText}] at ([xshift=12pt, yshift=-7pt]disp_box.north west) 
+      {\textsc{Layer 1: Multi-Tenant Host Scheduler \& Dynamic Column Slicing Decoder}};
+
+  % Host Scheduler Card
+  \node[card, draw=primaryAdark, fill=white, minimum width=6.6cm, minimum height=1.15cm] (host_sched) at (4.8, 13.8) {
+      \textbf{\fontsize{9}{10.5}\selectfont Multi-Tenant Workload Scheduler}\\[2pt]
+      \fontsize{7.5}{9}\selectfont \textcolor{primaryAdark}{\textbf{Tenant A:}} CNN (ResNet-50) $\;\boldsymbol{\cdot}\;$ \textcolor{primaryBdark}{\textbf{Tenant B:}} Transformer Attention
+  };
+
+  % Fission Decoder Card
+  \node[card, draw=memCol, fill=memBg!80, minimum width=7.2cm, minimum height=1.15cm] (fiss_dec) at (14.6, 13.8) {
+      \textbf{\fontsize{9}{10.5}\selectfont Dynamic Fission Decoder (\texttt{hdf\_fission\_decoder.sv})}\\[2pt]
+      \fontsize{7.5}{9}\selectfont Partition Reg: \texttt{cfg\_split\_col = 8} $\;\to\;$ \texttt{region\_id\_mask}, Mode \& Reconfig Strobes
+  };
+
+  \draw[->, line width=1.3pt, color=memCol] (host_sched) -- node[above, font=\fontsize{7.5}{8.5}\selectfont\bfseries\color{titleText}] {Dispatch Parameters} (fiss_dec);
+
+  % Control Signal Buses from Fission Decoder to Fabric
+  \draw[->, line width=1.1pt, color=primaryAdark] (fiss_dec.south -| 11.6, 13.2) -- ++(0,-0.65) -| (3.8, 11.2) 
+      node[pos=0.25, above, font=\fontsize{7.5}{8.5}\selectfont\bfseries\color{primaryAdark}] {Broadcast Mode: Weight-Stationary (WS)};
+  
+  \draw[->, line width=1.1pt, color=barrierCol] (fiss_dec.south -| 13.6, 13.2) -- ++(0,-0.65) -| (7.8, 11.2) 
+      node[pos=0.25, below, font=\fontsize{7.5}{8.5}\selectfont\bfseries\color{barrierDark}] {Column Split = 8};
+
+  \draw[->, line width=1.1pt, color=primaryBdark] (fiss_dec.south -| 16.0, 13.2) -- ++(0,-0.65) -| (12.3, 11.2) 
+      node[pos=0.25, above, font=\fontsize{7.5}{8.5}\selectfont\bfseries\color{primaryBdark}] {Broadcast Mode: Output-Stationary (OS)};
+
+  % ============================================================================
+  % LAYER 2: HETEROGENEOUS 2D SYSTOLIC ARRAY FABRIC
+  % ============================================================================
+  \node[card, fill=white, minimum width=19.6cm, minimum height=7.5cm] (mesh_box) at (10.0, 7.3) {};
+  \node[anchor=north west, font=\fontsize{9.5}{11}\selectfont\bfseries\color{titleText}] at ([xshift=12pt, yshift=-7pt]mesh_box.north west) 
+      {\textsc{Layer 2: Heterogeneous Systolic Compute Fabric ($16\times16$ Physical PE Mesh)}};
+
+  % ----------------------------------------------------------------------------
+  % Region A: Columns 0 to 7 (Weight-Stationary)
+  % ----------------------------------------------------------------------------
+  \node[card, draw=primaryA, fill=primaryAbg!35, dashed, line width=1.1pt, minimum width=5.8cm, minimum height=6.0cm] (regA_frame) at (3.8, 7.1) {};
+  \node[anchor=north, font=\fontsize{8.5}{10}\selectfont\bfseries\color{primaryAdark}] at ([yshift=-6pt]regA_frame.north) 
+      {Region A: Weight-Stationary (Cols 0--7)};
+  \node[anchor=north, font=\fontsize{7.5}{9}\selectfont\color{primaryAdark!90}] at ([yshift=-18pt]regA_frame.north) 
+      {CNN: Weights Pinned $\boldsymbol{\cdot}$ Activations Stream};
+
+  % Region A PEs
+  \node[peA] (pe00) at (1.8, 7.3) {PE[0,0]\\[1pt]\fontsize{6}{7}\selectfont\color{primaryAdark}WS};
+  \node[peA] (pe01) at (3.4, 7.3) {PE[0,1]\\[1pt]\fontsize{6}{7}\selectfont\color{primaryAdark}WS};
+  \node[font=\bfseries\fontsize{10}{12}\selectfont\color{primaryAdark}] (pe0dots) at (4.7, 7.3) {$\cdots$};
+  \node[peA] (pe07) at (5.8, 7.3) {PE[0,7]\\[1pt]\fontsize{6}{7}\selectfont\color{primaryAdark}WS};
+
+  \node[peA] (pe10) at (1.8, 5.8) {PE[1,0]\\[1pt]\fontsize{6}{7}\selectfont\color{primaryAdark}WS};
+  \node[peA] (pe11) at (3.4, 5.8) {PE[1,1]\\[1pt]\fontsize{6}{7}\selectfont\color{primaryAdark}WS};
+  \node[font=\bfseries\fontsize{10}{12}\selectfont\color{primaryAdark}] (pe1dots) at (4.7, 5.8) {$\cdots$};
+  \node[peA] (pe17) at (5.8, 5.8) {PE[1,7]\\[1pt]\fontsize{6}{7}\selectfont\color{primaryAdark}WS};
+
+  \node[font=\fontsize{8}{9.5}\selectfont\bfseries\color{primaryAdark}] at (3.8, 4.8) {$\boldsymbol{\vdots}$ (16 Rows in Grid)};
+
+  % Region A Intra-Mesh Streaming Connections
+  \draw[->, line width=1.0pt, color=primaryA] (pe00) -- (pe01);
+  \draw[->, line width=1.0pt, color=primaryA] (pe01) -- (pe0dots);
+  \draw[->, line width=1.0pt, color=primaryA] (pe0dots) -- (pe07);
+
+  \draw[->, line width=1.0pt, color=primaryA] (pe10) -- (pe11);
+  \draw[->, line width=1.0pt, color=primaryA] (pe11) -- (pe1dots);
+  \draw[->, line width=1.0pt, color=primaryA] (pe1dots) -- (pe17);
+
+  \draw[->, line width=1.0pt, color=primaryA] (pe00) -- (pe10);
+  \draw[->, line width=1.0pt, color=primaryA] (pe01) -- (pe11);
+  \draw[->, line width=1.0pt, color=primaryA] (pe07) -- (pe17);
+
+  % Region A Inputs
+  \draw[<-, line width=1.2pt, color=primaryAdark] (pe00.west) -- ++(-0.6,0) 
+      node[left, font=\fontsize{7}{8}\selectfont\bfseries] {Act $X_0$};
+  \draw[<-, line width=1.2pt, color=primaryAdark] (pe10.west) -- ++(-0.6,0) 
+      node[left, font=\fontsize{7}{8}\selectfont\bfseries] {Act $X_1$};
+
+  % ----------------------------------------------------------------------------
+  % DYNAMIC BOUNDARY BARRIER (Column 8)
+  % ----------------------------------------------------------------------------
+  \node[card, draw=barrierCol, fill=barrierBg!90, line width=1.3pt, minimum width=1.15cm, minimum height=6.0cm] (barrier) at (7.8, 7.1) {};
+  \node[rotate=90, font=\fontsize{7.5}{9}\selectfont\bfseries\color{barrierDark}] at (7.8, 7.5) 
+      {DYNAMIC BOUNDARY BARRIER};
+  \node[font=\fontsize{6}{7}\selectfont\bfseries\color{barrierDark}, align=center] at (7.8, 4.8) 
+      {Active Zero\\Gate\\\texttt{wire = 0}};
+
+  % Severed Wire Cross-Marks
+  \draw[line width=1.1pt, color=primaryA] (pe07.east) -- ++(0.3,0) coordinate (cut0);
+  \draw[line width=1.4pt, color=barrierCol] ([xshift=-3pt, yshift=-4pt]cut0) -- ([xshift=3pt, yshift=4pt]cut0);
+  \draw[line width=1.4pt, color=barrierCol] ([xshift=-3pt, yshift=4pt]cut0) -- ([xshift=3pt, yshift=-4pt]cut0);
+
+  \draw[line width=1.1pt, color=primaryA] (pe17.east) -- ++(0.3,0) coordinate (cut1);
+  \draw[line width=1.4pt, color=barrierCol] ([xshift=-3pt, yshift=-4pt]cut1) -- ([xshift=3pt, yshift=4pt]cut1);
+  \draw[line width=1.4pt, color=barrierCol] ([xshift=-3pt, yshift=4pt]cut1) -- ([xshift=3pt, yshift=-4pt]cut1);
+
+  % ----------------------------------------------------------------------------
+  % Region B: Columns 8 to 15 (Output-Stationary)
+  % ----------------------------------------------------------------------------
+  \node[card, draw=primaryB, fill=primaryBbg!35, dashed, line width=1.1pt, minimum width=5.8cm, minimum height=6.0cm] (regB_frame) at (12.3, 7.1) {};
+  \node[anchor=north, font=\fontsize{8.5}{10}\selectfont\bfseries\color{primaryBdark}] at ([yshift=-6pt]regB_frame.north) 
+      {Region B: Output-Stationary (Cols 8--15)};
+  \node[anchor=north, font=\fontsize{7.5}{9}\selectfont\color{primaryBdark!90}] at ([yshift=-18pt]regB_frame.north) 
+      {Attention: Acc Pinned $\boldsymbol{\cdot}$ Queries $Q \downarrow$ \& Keys $K \to$};
+
+  % Region B PEs
+  \node[peB] (pe08) at (10.3, 7.3) {PE[0,8]\\[1pt]\fontsize{6}{7}\selectfont\color{primaryBdark}OS};
+  \node[peB] (pe09) at (11.9, 7.3) {PE[0,9]\\[1pt]\fontsize{6}{7}\selectfont\color{primaryBdark}OS};
+  \node[font=\bfseries\fontsize{10}{12}\selectfont\color{primaryBdark}] (pe0dotsB) at (13.2, 7.3) {$\cdots$};
+  \node[peB] (pe015) at (14.3, 7.3) {PE[0,15]\\[1pt]\fontsize{6}{7}\selectfont\color{primaryBdark}OS};
+
+  \node[peB] (pe18) at (10.3, 5.8) {PE[1,8]\\[1pt]\fontsize{6}{7}\selectfont\color{primaryBdark}OS};
+  \node[peB] (pe19) at (11.9, 5.8) {PE[1,9]\\[1pt]\fontsize{6}{7}\selectfont\color{primaryBdark}OS};
+  \node[font=\bfseries\fontsize{10}{12}\selectfont\color{primaryBdark}] (pe1dotsB) at (13.2, 5.8) {$\cdots$};
+  \node[peB] (pe115) at (14.3, 5.8) {PE[1,15]\\[1pt]\fontsize{6}{7}\selectfont\color{primaryBdark}OS};
+
+  \node[font=\fontsize{8}{9.5}\selectfont\bfseries\color{primaryBdark}] at (12.3, 4.8) {$\boldsymbol{\vdots}$ (16 Rows in Grid)};
+
+  % Region B Intra-Mesh Streaming Connections
+  \draw[->, line width=1.0pt, color=primaryB] (pe08) -- (pe09);
+  \draw[->, line width=1.0pt, color=primaryB] (pe09) -- (pe0dotsB);
+  \draw[->, line width=1.0pt, color=primaryB] (pe0dotsB) -- (pe015);
+
+  \draw[->, line width=1.0pt, color=primaryB] (pe18) -- (pe19);
+  \draw[->, line width=1.0pt, color=primaryB] (pe19) -- (pe1dotsB);
+  \draw[->, line width=1.0pt, color=primaryB] (pe1dotsB) -- (pe115);
+
+  \draw[->, line width=1.0pt, color=primaryB] (pe08) -- (pe18);
+  \draw[->, line width=1.0pt, color=primaryB] (pe09) -- (pe19);
+  \draw[->, line width=1.0pt, color=primaryB] (pe015) -- (pe115);
+
+  % Region B Fresh Dedicated Inputs (bypassing the barrier cleanly)
+  \draw[<-, line width=1.1pt, color=primaryBdark] (pe08.west) -- ++(-0.6,0) 
+      node[above left, font=\fontsize{6}{7}\selectfont\bfseries] {Keys $K_0$};
+  \draw[<-, line width=1.1pt, color=primaryBdark] (pe18.west) -- ++(-0.6,0) 
+      node[above left, font=\fontsize{6}{7}\selectfont\bfseries] {Keys $K_1$};
+
+  \draw[<-, line width=1.1pt, color=primaryBdark] (pe08.north) -- ++(0,0.5) 
+      node[above, font=\fontsize{6.5}{7.5}\selectfont\bfseries] {Queries $Q_0$};
+  \draw[<-, line width=1.1pt, color=primaryBdark] (pe09.north) -- ++(0,0.5) 
+      node[above, font=\fontsize{6.5}{7.5}\selectfont\bfseries] {Queries $Q_1$};
+
+  % ----------------------------------------------------------------------------
+  % ZOOMED CALLOUT: HETEROGENEOUS PROCESSING ELEMENT MICROARCHITECTURE
+  % ----------------------------------------------------------------------------
+  \node[card, draw=memDark, fill=memBg!60, line width=1.1pt, minimum width=3.3cm, minimum height=6.0cm] (pe_zoom) at (17.5, 7.1) {
+      \textbf{\fontsize{9}{10.5}\selectfont\color{memDark}\texttt{hdf\_pe} Core}\\[3pt]
+      \rule{2.9cm}{0.5pt}\\[4pt]
+      \textbf{\fontsize{7.5}{9}\selectfont 3-Way Dataflow MUXes}\\[1pt]
+      \fontsize{6.5}{7.5}\selectfont\textcolor{titleText}{WS $\parallel$ OS $\parallel$ IS Dynamic}\\[6pt]
+      \textbf{\fontsize{7.5}{9}\selectfont Signed MAC Pipeline}\\[1pt]
+      \fontsize{6.5}{7.5}\selectfont$8\text{b} \times 8\text{b} \to 32\text{b}$ Accumulator\\[6pt]
+      \textbf{\fontsize{7.5}{9}\selectfont Lifetime Drain Counter}\\[1pt]
+      \fontsize{6.5}{7.5}\selectfont\texttt{lifetime\_cnt} Downcounter\\[6pt]
+      \textbf{\fontsize{7.5}{9}\selectfont Memory Safety Lock}\\[1pt]
+      \fontsize{6.5}{7.5}\selectfont\texttt{bank\_role\_stale} Interlock
+  };
+  \draw[dashed, line width=0.9pt, color=memDark] (pe015.north east) -- (pe_zoom.north west);
+  \draw[dashed, line width=0.9pt, color=memDark] (pe115.south east) -- (pe_zoom.south west);
+
+  % ============================================================================
+  % LAYER 3: RECONFIGURABLE SHARED SRAM SUBSTRATE & SECURITY ENGINE
+  % ============================================================================
+  \node[card, fill=panelBg, minimum width=19.6cm, minimum height=2.8cm] (mem_box) at (10.0, 1.6) {};
+  \node[anchor=north west, font=\fontsize{9.5}{11}\selectfont\bfseries\color{titleText}] at ([xshift=12pt, yshift=-7pt]mem_box.north west) 
+      {\textsc{Layer 3: Shared Reconfigurable SRAM Substrate \& EPPA Hardware Security Engine}};
+
+  % Memory Banks
+  \node[bankA] (bank0) at (2.2, 1.8) {SRAM Bank 0\\[1pt]\fontsize{7}{8}\selectfont Region A (Weights)};
+  \node[bankA] (bank1) at (5.2, 1.8) {SRAM Bank 1\\[1pt]\fontsize{7}{8}\selectfont Region A (Act / Out)};
+
+  \node[bankB] (bank2) at (9.0, 1.8) {SRAM Bank 2\\[1pt]\fontsize{7}{8}\selectfont Region B ($Q$ Stream)};
+  \node[bankB] (bank3) at (12.0, 1.8) {SRAM Bank 3\\[1pt]\fontsize{7}{8}\selectfont Region B ($K$ Stream)};
+  \node[bankB] (bank4) at (15.0, 1.8) {SRAM Bank 4\\[1pt]\fontsize{7}{8}\selectfont Region B (Attn Map)};
+
+  % Inter-Layer Memory Bus Connections (Drawn cleanly in the vertical channel)
+  \draw[<->, line width=1.3pt, color=primaryAdark] (3.8, 3.0) -- (3.8, 3.55) 
+      node[midway, fill=white, inner sep=2pt, font=\fontsize{7}{8}\selectfont\bfseries\color{primaryAdark}] {Region A Memory Bus};
+
+  \draw[<->, line width=1.3pt, color=primaryBdark] (12.3, 3.0) -- (12.3, 3.55) 
+      node[midway, fill=white, inner sep=2pt, font=\fontsize{7}{8}\selectfont\bfseries\color{primaryBdark}] {Region B Memory Bus};
+
+  % Hardware Engines Row
+  \node[card, draw=memDark, fill=memBg, minimum width=5.6cm, minimum height=0.75cm] (eppa_box) at (4.2, 0.75) {
+      \textbf{\fontsize{8}{9.5}\selectfont EPPA Dynamic Arbiter (\texttt{eppa\_arbiter.sv})}\\[1pt]
+      \fontsize{6.5}{7.5}\selectfont Quasi-static Rebalance: Idle WS Bandwidth $\;\to\;$ Streaming OS
+  };
+
+  \node[card, draw=secDark, fill=secBg, minimum width=4.8cm, minimum height=0.75cm] (otp_box) at (10.4, 0.75) {
+      \textbf{\fontsize{8}{9.5}\selectfont OTP Token FSM (\texttt{otp\_token\_fsm.sv})}\\[1pt]
+      \fontsize{6.5}{7.5}\selectfont Single-Writer Epoch Rotating Priority Protocol
+  };
+
+  \node[card, draw=secDark, fill=secBg, minimum width=4.8cm, minimum height=0.75cm] (scrub_box) at (16.0, 0.75) {
+      \textbf{\fontsize{8}{9.5}\selectfont Mandatory Bank Scrub (\texttt{pod\_bank\_scrub.sv})}\\[1pt]
+      \fontsize{6.5}{7.5}\selectfont 4-Cycle Hardware Zeroing Anti-Leakage Scrub
+  };
+
+  \draw[<->, line width=1.0pt, color=memCol] (eppa_box.east) -- (otp_box.west);
+  \draw[->, line width=1.0pt, color=secCol] (otp_box.east) -- (scrub_box.west);
+
+\end{tikzpicture}
+\end{document}
