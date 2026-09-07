@@ -3,6 +3,11 @@
 *.vcd
 *.log
 obj_dir/
+output/
+xcelium.d/
+waves.shm/
+.simvision/
+xrun.history
 *.o
 *.d
 *.a

@@ -130,19 +130,23 @@ mt_npu/
 ## 5. Quickstart & Simulation Guide
 
 ### Prerequisites
-* **Verilator 5.020+** (recommended for high-speed simulation with native timing)
+* **Cadence Xcelium / xrun** (for industry-grade ASIC simulation and SimVision GUI debugging)
+* **Verilator 5.020+** (recommended for high-speed open-source simulation with native timing)
 * **Icarus Verilog 12+** (`iverilog` / `vvp` dual compatibility)
-* **Graphviz** (`dot` for rendering architecture figures)
 
 ### Running All Models with a Single Command
 To execute the automated simulation testsuite across all three architectural models:
 
 ```bash
-# Run all 3 models with Verilator (default)
-./scripts/run_all_models.sh verilator
+# Run all 3 models with Cadence Xcelium (batch mode)
+make run-all GUI=0
 
-# Or run all 3 models with Icarus Verilog
-./scripts/run_all_models.sh iverilog
+# Run all 3 models with Cadence Xcelium (interactive GUI / SimVision)
+make run-all GUI=1
+
+# Or run with open-source toolchains
+make run-all SIM_TOOL=verilator   # or ./scripts/run_all_models.sh verilator
+make run-all SIM_TOOL=iverilog    # or ./scripts/run_all_models.sh iverilog
 ```
 
 ### Running Individual Models

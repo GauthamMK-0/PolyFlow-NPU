@@ -34,6 +34,14 @@ models/spatial_fission/
 
 ## Verification & Simulation
 
+### Using Cadence Xcelium (xrun)
+```bash
+cd models/spatial_fission
+make run         # Interactive GUI mode with SimVision
+make run GUI=0   # Batch / headless mode
+make clean       # Clean output/ and log files
+```
+
 ### Using Verilator
 ```bash
 cd models/spatial_fission

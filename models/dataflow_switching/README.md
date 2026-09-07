@@ -29,6 +29,14 @@ models/dataflow_switching/
 
 ## Verification & Simulation
 
+### Using Cadence Xcelium (xrun)
+```bash
+cd models/dataflow_switching
+make run         # Interactive GUI mode with SimVision
+make run GUI=0   # Batch / headless mode
+make clean       # Clean output/ and log files
+```
+
 ### Using Verilator
 ```bash
 cd models/dataflow_switching
