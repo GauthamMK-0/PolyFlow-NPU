@@ -53,12 +53,20 @@ run:
 		$(addprefix ../, $(SRC_FILES)) \
 		$(XRUN_FLAGS)
 
+synth:
+	@echo "=================================================================="
+	@echo "Launching Cadence Genus Synthesis for hdf_top"
+	@echo "=================================================================="
+	genus -f synth_hdf.tcl -log genus_hdf.log
+
 clean:
-	@echo "Cleaning up all simulation logs and compile databases..."
-	rm -rf $(OUT_DIR) xcelium.d waves.shm .simvision xrun.history xrun.log
+	@echo "Cleaning up all simulation logs, compile databases, and synthesis reports..."
+	rm -rf $(OUT_DIR) xcelium.d waves.shm .simvision xrun.history xrun.log genus* fv/ *.rpt *_netlist.*
 
 help:
 	@echo "Available Makefile targets:"
 	@echo "  make run         - Run simulation with GUI enabled (default)"
 	@echo "  make run GUI=0   - Run simulation in batch/command-line mode"
-	@echo "  make clean       - Delete the output directory and all log files"
+	@echo "  make synth       - Run Cadence Genus logic synthesis using synth_hdf.tcl"
+	@echo "  make clean       - Delete output directories, reports, and log files"
+

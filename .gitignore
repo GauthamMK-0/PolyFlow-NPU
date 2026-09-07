@@ -3,11 +3,19 @@
 *.vcd
 *.log
 obj_dir/
+# Cadence simulation & synthesis artifacts
 output/
 xcelium.d/
 waves.shm/
 .simvision/
 xrun.history
+fv/
+genus.cmd*
+genus.log*
+*.rpt
+*_netlist.*
+*.sdf
+
 *.o
 *.d
 *.a
