@@ -138,15 +138,15 @@ mt_npu/
 To execute the automated simulation testsuite across all three architectural models:
 
 ```bash
-# Run all 3 models with Cadence Xcelium (batch mode)
-make run-all GUI=0
+# Option A: Industry-grade simulation with Cadence Xcelium (xrun)
+make run-all GUI=0               # Batch / headless mode
+make run-all GUI=1               # Interactive SimVision GUI mode
 
-# Run all 3 models with Cadence Xcelium (interactive GUI / SimVision)
-make run-all GUI=1
+# Option B: High-speed open-source simulation with Verilator
+./scripts/run_all_models.sh verilator
 
-# Or run with open-source toolchains
-make run-all SIM_TOOL=verilator   # or ./scripts/run_all_models.sh verilator
-make run-all SIM_TOOL=iverilog    # or ./scripts/run_all_models.sh iverilog
+# Option C: Icarus Verilog
+./scripts/run_all_models.sh iverilog
 ```
 
 ### Running Individual Models
