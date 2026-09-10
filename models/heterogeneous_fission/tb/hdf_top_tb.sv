@@ -46,6 +46,12 @@ module hdf_top_tb;
     wire  [NUM_REGIONS-1:0]             reconfig_urgent;
     wire  [NUM_BANKS-1:0]               scrub_active_bus;
     wire  [NUM_BANKS-1:0]               bank_role_clear_bus;
+    wire  [NUM_BANKS*NUM_REGIONS-1:0]   token_grant_bus;
+    wire  [NUM_BANKS-1:0]               token_held_bus;
+    wire  [NUM_BANKS*REGION_W-1:0]      token_owner_bus;
+    wire  [NUM_BANKS*REGION_W-1:0]      bank_owner_bus;
+    wire  [NUM_BANKS*2-1:0]             bank_role_tag_bus;
+    wire  [NUM_COLS-1:0]                pe_bank_role_stale_bus;
     /* verilator lint_on UNUSEDSIGNAL */
 
     wire  [NUM_ROWS*NUM_COLS*ACC_W-1:0] acc_out_flat;
@@ -110,7 +116,13 @@ module hdf_top_tb;
         .reconfig_urgent       (reconfig_urgent),
         .region_id_mask        (region_id_mask),
         .scrub_active_bus      (scrub_active_bus),
-        .bank_role_clear_bus   (bank_role_clear_bus)
+        .bank_role_clear_bus   (bank_role_clear_bus),
+        .token_grant_bus       (token_grant_bus),
+        .token_held_bus        (token_held_bus),
+        .token_owner_bus       (token_owner_bus),
+        .bank_owner_bus        (bank_owner_bus),
+        .bank_role_tag_bus     (bank_role_tag_bus),
+        .pe_bank_role_stale_bus(pe_bank_role_stale_bus)
     );
 
     initial clk = 0;

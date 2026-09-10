@@ -6,7 +6,6 @@
 module sfa_array #(
     parameter int DATA_W   = 8,
     parameter int ACC_W    = 32,
-    parameter int REGION_W = 1,
     parameter int NUM_ROWS = 4,
     parameter int NUM_COLS = 4
 ) (
@@ -65,23 +64,17 @@ module sfa_array #(
         end
     end
 
-    // Wire per-column stale flag from row 0 PEs
-    wire [NUM_COLS-1:0] col_stale;
-    assign pe_bank_role_stale = col_stale;
+    wire pe_stale_matrix [NUM_ROWS-1:0][NUM_COLS-1:0];
 
     // PE Instantiations
     for (genvar r = 0; r < NUM_ROWS; r++) begin : gen_pe_row
         for (genvar c = 0; c < NUM_COLS; c++) begin : gen_pe_col
             wire [ACC_W-1:0] pe_acc;
-            /* verilator lint_off UNUSEDSIGNAL */
-            wire             pe_stale;
-            /* verilator lint_on UNUSEDSIGNAL */
             wire             reg_id = region_id_mask[c];
 
             sfa_pe #(
                 .DATA_W(DATA_W),
-                .ACC_W(ACC_W),
-                .REGION_W(REGION_W)
+                .ACC_W(ACC_W)
             ) u_pe (
                 .clk            (clk),
                 .rst_n          (rst_n),
@@ -90,9 +83,8 @@ module sfa_array #(
                 .dout_s         (mesh_s[r][c]),
                 .dout_e         (mesh_e[r][c]),
                 .acc_out        (pe_acc),
-                .region_id      (reg_id),
                 .region_reassign(region_reassign_bus[c]),
-                .bank_role_stale(pe_stale),
+                .bank_role_stale(pe_stale_matrix[r][c]),
                 .bank_role_clear(pe_bank_role_clear[c]),
                 .w_ld           (w_ld[reg_id]),
                 .acc_clr        (acc_clr[reg_id]),
@@ -100,11 +92,19 @@ module sfa_array #(
             );
 
             assign acc_out_flat[(r*NUM_COLS + c)*ACC_W +: ACC_W] = pe_acc;
+        end
+    end
 
-            if (r == 0) begin : gen_col_stale
-                assign col_stale[c] = pe_stale;
+    // Reduce stale flag across all rows in each column
+    for (genvar c = 0; c < NUM_COLS; c++) begin : gen_col_stale
+        logic col_any_stale;
+        always_comb begin
+            col_any_stale = 1'b0;
+            for (int r = 0; r < NUM_ROWS; r++) begin
+                col_any_stale |= pe_stale_matrix[r][c];
             end
         end
+        assign pe_bank_role_stale[c] = col_any_stale;
     end
 
     // External outputs

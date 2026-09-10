@@ -52,14 +52,20 @@ module sfa_top #(
     output logic [NUM_REGIONS-1:0]              reconfig_urgent,
     output logic [NUM_COLS-1:0]                 region_id_mask,
     output logic [NUM_BANKS-1:0]                scrub_active_bus,
-    output logic [NUM_BANKS-1:0]                bank_role_clear_bus
+    output logic [NUM_BANKS-1:0]                bank_role_clear_bus,
+    output logic [NUM_BANKS*NUM_REGIONS-1:0]    token_grant_bus,
+    output logic [NUM_BANKS-1:0]                token_held_bus,
+    output logic [NUM_BANKS*REGION_W-1:0]       token_owner_bus,
+    output logic [NUM_BANKS*REGION_W-1:0]       bank_owner_bus,
+    output logic [NUM_BANKS*2-1:0]              bank_role_tag_bus,
+    output logic [NUM_COLS-1:0]                 pe_bank_role_stale_bus
 );
 
     wire [NUM_COLS-1:0] region_reassign_bus;
-    /* verilator lint_off UNUSEDSIGNAL */
     wire [NUM_COLS-1:0] pe_bank_role_stale;
-    /* verilator lint_on UNUSEDSIGNAL */
     logic [NUM_COLS-1:0] pe_bank_role_clear;
+
+    assign pe_bank_role_stale_bus = pe_bank_role_stale;
 
     // Fission Decoder
     sfa_fission_decoder #(
@@ -91,13 +97,11 @@ module sfa_top #(
         wire clr_wire;
         wire [NUM_REGIONS-1:0] req_bank     = {token_req_B[b], token_req_A[b]};
         wire [NUM_REGIONS-1:0] rel_bank     = {token_release_B[b], token_release_A[b]};
-        /* verilator lint_off UNUSEDSIGNAL */
         wire [REGION_W-1:0]    token_owner;
         wire                   token_held;
         wire [NUM_REGIONS-1:0] grant;
         wire [REGION_W-1:0]    reg_owner;
         wire [1:0]             role_tag_wire;
-        /* verilator lint_on UNUSEDSIGNAL */
 
         sfa_otp_fsm #(
             .NUM_REGIONS(NUM_REGIONS),
@@ -127,8 +131,13 @@ module sfa_top #(
             .role_tag       (role_tag_wire)
         );
 
-        assign scrub_active_bus[b]    = scrub_wire;
-        assign bank_role_clear_bus[b] = clr_wire;
+        assign scrub_active_bus[b]                            = scrub_wire;
+        assign bank_role_clear_bus[b]                         = clr_wire;
+        assign token_grant_bus[b*NUM_REGIONS +: NUM_REGIONS] = grant;
+        assign token_held_bus[b]                              = token_held;
+        assign token_owner_bus[b*REGION_W +: REGION_W]       = token_owner;
+        assign bank_owner_bus[b*REGION_W +: REGION_W]        = reg_owner;
+        assign bank_role_tag_bus[b*2 +: 2]                    = role_tag_wire;
     end
 
     // Broadcast clear signals to PEs based on region
@@ -146,7 +155,6 @@ module sfa_top #(
     sfa_array #(
         .DATA_W(DATA_W),
         .ACC_W(ACC_W),
-        .REGION_W(REGION_W),
         .NUM_ROWS(NUM_ROWS),
         .NUM_COLS(NUM_COLS)
     ) u_array (

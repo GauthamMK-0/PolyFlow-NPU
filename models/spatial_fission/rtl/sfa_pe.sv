@@ -4,9 +4,8 @@
 `timescale 1ns/1ps
 
 module sfa_pe #(
-    parameter int DATA_W   = 8,
-    parameter int ACC_W    = 32,
-    parameter int REGION_W = 1
+    parameter int DATA_W = 8,
+    parameter int ACC_W  = 32
 ) (
     input  logic                    clk,
     input  logic                    rst_n,
@@ -21,9 +20,6 @@ module sfa_pe #(
     output logic [ACC_W-1:0]        acc_out,
 
     // Region assignment & security flags
-    /* verilator lint_off UNUSEDSIGNAL */
-    input  logic [REGION_W-1:0]     region_id,
-    /* verilator lint_on UNUSEDSIGNAL */
     input  logic                    region_reassign,
     output logic                    bank_role_stale,
     input  logic                    bank_role_clear,

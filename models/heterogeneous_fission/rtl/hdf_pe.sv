@@ -6,8 +6,7 @@
 module hdf_pe #(
     parameter int DATA_W     = 8,
     parameter int ACC_W      = 32,
-    parameter int LIFETIME_W = 4,
-    parameter int REGION_W   = 1
+    parameter int LIFETIME_W = 4
 ) (
     input  logic                    clk,
     input  logic                    rst_n,
@@ -23,9 +22,6 @@ module hdf_pe #(
 
     // Runtime dataflow & region configuration
     input  logic [1:0]              dataflow_mode, // 00=WS, 01=OS, 10=IS, 11=RSVD
-    /* verilator lint_off UNUSEDSIGNAL */
-    input  logic [REGION_W-1:0]     region_id,
-    /* verilator lint_on UNUSEDSIGNAL */
     input  logic                    region_reassign,
 
     // Lifetime counter (drain window during handover)
