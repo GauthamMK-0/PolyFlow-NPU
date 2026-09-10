@@ -51,6 +51,22 @@ synth-model2:
 synth-model3:
 	$(MAKE) -C models/heterogeneous_fission synth
 
+# Verilator lint-only validation across all 3 models
+lint-all:
+	@echo "=================================================================="
+	@echo " Running Verilator Strict Linting (--lint-only -Wall) on All Models"
+	@echo "=================================================================="
+	@for m in $(MODELS); do \
+		echo -n ">>> Linting $$m ... "; \
+		verilator --lint-only -Wall --timing $$m/rtl/*.sv $$m/tb/*.sv || exit 1; \
+		echo "CLEAN (0 errors, 0 warnings)"; \
+	done
+	@echo "=================================================================="
+	@echo " [SUCCESS] All models passed Verilator strict -Wall lint check!"
+	@echo "=================================================================="
+
+lint: lint-all
+
 clean-all:
 	@for m in $(MODELS); do \
 		$(MAKE) -C $$m clean; \
@@ -60,7 +76,8 @@ clean-all:
 clean: clean-all
 
 help:
-	@echo "PolyFlow-NPU Cadence Verification & Synthesis Targets:"
+	@echo "PolyFlow-NPU Verification, Linting & Synthesis Targets:"
+	@echo "  make lint              - Run Verilator strict linting (--lint-only -Wall) across all models"
 	@echo "  make run-all           - Run all 3 simulation testbenches with SimVision GUI"
 	@echo "  make run-all GUI=0     - Run all 3 simulation testbenches in batch mode"
 	@echo "  make run-model1 GUI=0  - Run Model 1 simulation in batch mode"

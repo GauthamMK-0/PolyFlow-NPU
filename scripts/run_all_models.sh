@@ -18,7 +18,7 @@ run_model_1() {
     echo -e "\n>>> [MODEL 1] Dataflow Switching (Sequential, Single Tenant) <<<"
     cd "$ROOT_DIR/models/dataflow_switching"
     if [ "$SIM_TOOL" = "verilator" ]; then
-        verilator --binary --timing -Wall -Wno-fatal -Wno-DECLFILENAME -Wno-TIMESCALEMOD \
+        verilator --binary --timing -Wall \
             rtl/dfs_pe.sv rtl/dfs_array.sv rtl/dfs_top.sv tb/dfs_top_tb.sv \
             --top-module dfs_top_tb -o Vdfs_top_tb > /dev/null
         ./obj_dir/Vdfs_top_tb
@@ -32,7 +32,7 @@ run_model_2() {
     echo -e "\n>>> [MODEL 2] Spatial Fission (Homogeneous WS Multi-Tenant) <<<"
     cd "$ROOT_DIR/models/spatial_fission"
     if [ "$SIM_TOOL" = "verilator" ]; then
-        verilator --binary --timing -Wall -Wno-fatal -Wno-DECLFILENAME -Wno-TIMESCALEMOD \
+        verilator --binary --timing -Wall \
             rtl/sfa_pe.sv rtl/sfa_fission_decoder.sv rtl/sfa_array.sv \
             rtl/sfa_otp_fsm.sv rtl/sfa_bank_scrub.sv rtl/sfa_eppa.sv rtl/sfa_top.sv \
             tb/sfa_top_tb.sv --top-module sfa_top_tb -o Vsfa_top_tb > /dev/null
@@ -47,7 +47,7 @@ run_model_3() {
     echo -e "\n>>> [MODEL 3] Heterogeneous Fission (PolyFlow-NPU / Novel Proposed) <<<"
     cd "$ROOT_DIR/models/heterogeneous_fission"
     if [ "$SIM_TOOL" = "verilator" ]; then
-        verilator --binary --timing -Wall -Wno-fatal -Wno-DECLFILENAME -Wno-TIMESCALEMOD \
+        verilator --binary --timing -Wall \
             rtl/hdf_pe.sv rtl/hdf_fission_decoder.sv rtl/hdf_array_grid.sv \
             rtl/eppa_arbiter.sv rtl/otp_token_fsm.sv rtl/pod_bank_scrub.sv rtl/hdf_top.sv \
             tb/hdf_top_tb.sv --top-module hdf_top_tb -o Vhdf_top_tb > /dev/null
