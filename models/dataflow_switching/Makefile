@@ -72,7 +72,7 @@ synth:
 
 clean:
 	@echo "Cleaning up all simulation logs, compile databases, and synthesis reports..."
-	rm -rf $(OUT_DIR) xcelium.d waves.shm .simvision xrun.history xrun.log genus* fv/ *.rpt *_netlist.*
+	rm -rf $(OUT_DIR) xcelium.d waves.shm .simvision xrun.history xrun.log genus* fv/ *.rpt *_netlist.* reports/
 
 help:
 	@echo "Available Makefile targets:"

@@ -41,10 +41,11 @@ syn_map
 syn_opt
 
 # --- Timing, Power, and Area Reports ---
-report_timing > timing_dfs.rpt
-report_power  > power_dfs.rpt
-report_area   > area_dfs.rpt
-report_qor    > qor_dfs.rpt
+file mkdir reports
+report_timing > reports/timing_dfs.rpt
+report_power  > reports/power_dfs.rpt
+report_area   > reports/area_dfs.rpt
+report_qor    > reports/qor_dfs.rpt
 
 # --- Netlist & Gate-Level Files Generation ---
 write_hdl > dfs_top_netlist.v

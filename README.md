@@ -138,7 +138,7 @@ make run GUI=1      # SimVision GUI
 make run GUI=0      # Command-line batch
 
 # 3. Synthesize with Cadence Genus:
-make synth          # Produces timing_dfs.rpt, area_dfs.rpt, power_dfs.rpt, and dfs_top_netlist.v
+make synth          # Produces reports/timing_dfs.rpt, reports/area_dfs.rpt, reports/power_dfs.rpt, and dfs_top_netlist.v
 
 # 4. Clean artifacts:
 make clean
@@ -157,7 +157,7 @@ make run GUI=1      # SimVision GUI
 make run GUI=0      # Command-line batch
 
 # 3. Synthesize with Cadence Genus:
-make synth          # Produces timing_sfa.rpt, area_sfa.rpt, power_sfa.rpt, and sfa_top_netlist.v
+make synth          # Produces reports/timing_sfa.rpt, reports/area_sfa.rpt, reports/power_sfa.rpt, and sfa_top_netlist.v
 
 # 4. Clean artifacts:
 make clean
@@ -176,7 +176,7 @@ make run GUI=1      # SimVision GUI
 make run GUI=0      # Command-line batch
 
 # 3. Synthesize with Cadence Genus:
-make synth          # Produces timing_hdf.rpt, area_hdf.rpt, power_hdf.rpt, and hdf_top_netlist.v
+make synth          # Produces reports/timing_hdf.rpt, reports/area_hdf.rpt, reports/power_hdf.rpt, and hdf_top_netlist.v
 
 # 4. Clean artifacts:
 make clean

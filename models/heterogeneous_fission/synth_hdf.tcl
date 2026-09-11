@@ -49,10 +49,11 @@ syn_map
 syn_opt
 
 # --- Timing, Power, and Area Reports ---
-report_timing > timing_hdf.rpt
-report_power  > power_hdf.rpt
-report_area   > area_hdf.rpt
-report_qor    > qor_hdf.rpt
+file mkdir reports
+report_timing > reports/timing_hdf.rpt
+report_power  > reports/power_hdf.rpt
+report_area   > reports/area_hdf.rpt
+report_qor    > reports/qor_hdf.rpt
 
 # --- Netlist & Gate-Level Files Generation ---
 write_hdl > hdf_top_netlist.v

@@ -49,10 +49,11 @@ syn_map
 syn_opt
 
 # --- Timing, Power, and Area Reports ---
-report_timing > timing_sfa.rpt
-report_power  > power_sfa.rpt
-report_area   > area_sfa.rpt
-report_qor    > qor_sfa.rpt
+file mkdir reports
+report_timing > reports/timing_sfa.rpt
+report_power  > reports/power_sfa.rpt
+report_area   > reports/area_sfa.rpt
+report_qor    > reports/qor_sfa.rpt
 
 # --- Netlist & Gate-Level Files Generation ---
 write_hdl > sfa_top_netlist.v

@@ -13,6 +13,7 @@ fv/
 genus.cmd*
 genus.log*
 *.rpt
+reports/
 *_netlist.*
 *.sdf
 
