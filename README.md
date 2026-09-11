@@ -112,7 +112,9 @@ Navigate into any model directory (`cd models/<model_name>`) and run:
 
 | Target | Description | Options |
 | :--- | :--- | :--- |
-| `make lint` | Run strict Verilator linting (`--lint-only -Wall`) on the model's RTL and TB | Strict `-Wall`, `--timing` |
+| `make lint-verilator` | Run strict Verilator linting (`--lint-only -Wall`) on the model's RTL and TB | Strict `-Wall`, `--timing` |
+| `make lint-cadence` | Run Cadence HAL linting on the model's RTL and TB | Cadence environment |
+| `make lint` | Run default lint check (aliases to `lint-verilator`) | — |
 | `make run` | Launch Cadence Xcelium (`xrun`) simulation with SimVision GUI | `GUI=1` (Default) |
 | `make run GUI=0` | Run Cadence Xcelium (`xrun`) simulation in headless batch mode | Batch / CI mode |
 | `make synth` | Run Cadence Genus ASIC logic synthesis mapped to target library (`slow.lib`) | Generates netlist & reports |
@@ -127,8 +129,9 @@ Navigate into any model directory (`cd models/<model_name>`) and run:
 ```bash
 cd models/dataflow_switching
 
-# 1. Strict lint check:
-make lint
+# 1. Lint checks (Verilator or Cadence HAL):
+make lint-verilator # Strict Verilator -Wall lint
+make lint-cadence   # Cadence HAL lint
 
 # 2. Simulate with Cadence Xcelium (interactive GUI or batch):
 make run GUI=1      # SimVision GUI
@@ -145,8 +148,9 @@ make clean
 ```bash
 cd models/spatial_fission
 
-# 1. Strict lint check:
-make lint
+# 1. Lint checks (Verilator or Cadence HAL):
+make lint-verilator # Strict Verilator -Wall lint
+make lint-cadence   # Cadence HAL lint
 
 # 2. Simulate with Cadence Xcelium:
 make run GUI=1      # SimVision GUI
@@ -163,8 +167,9 @@ make clean
 ```bash
 cd models/heterogeneous_fission
 
-# 1. Strict lint check:
-make lint
+# 1. Lint checks (Verilator or Cadence HAL):
+make lint-verilator # Strict Verilator -Wall lint
+make lint-cadence   # Cadence HAL lint
 
 # 2. Simulate with Cadence Xcelium:
 make run GUI=1      # SimVision GUI

@@ -37,16 +37,25 @@ XRUN_FLAGS = -64bit \
 # ==============================================================================
 # Targets
 # ==============================================================================
-.PHONY: all run clean help lint synth
+.PHONY: all run clean help lint lint-verilator lint-cadence synth
 
 # Default target when you just type 'make'
 all: run
 
-lint:
+# --- Linting Targets ---
+lint: lint-verilator
+
+lint-verilator:
 	@echo "=================================================================="
 	@echo "Running Verilator Strict Linting for Model 2 (sfa_top)"
 	@echo "=================================================================="
 	verilator --lint-only -Wall --timing $(SRC_FILES)
+
+lint-cadence:
+	@echo "=================================================================="
+	@echo "Running Cadence HAL / Xcelium Linting for Model 2 (sfa_top)"
+	@echo "=================================================================="
+	hal $(SRC_FILES)
 
 run:
 	@echo "=================================================================="
@@ -71,9 +80,11 @@ clean:
 
 help:
 	@echo "Available Makefile targets:"
-	@echo "  make lint        - Run strict Verilator linting (--lint-only -Wall)"
-	@echo "  make run         - Run simulation with GUI enabled (default)"
-	@echo "  make run GUI=0   - Run simulation in batch/command-line mode"
-	@echo "  make synth       - Run Cadence Genus logic synthesis using synth_sfa.tcl"
-	@echo "  make clean       - Delete output directories, reports, and log files"
+	@echo "  make lint            - Run default linting (Verilator)"
+	@echo "  make lint-verilator  - Run strict Verilator linting (--lint-only -Wall)"
+	@echo "  make lint-cadence    - Run Cadence HAL linting"
+	@echo "  make run             - Run simulation with GUI enabled (default)"
+	@echo "  make run GUI=0       - Run simulation in batch/command-line mode"
+	@echo "  make synth           - Run Cadence Genus logic synthesis using synth_sfa.tcl"
+	@echo "  make clean           - Delete output directories, reports, and log files"
 
