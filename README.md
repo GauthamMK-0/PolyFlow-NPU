@@ -78,7 +78,6 @@ mt_npu/
 │   └── run_all_models.sh                 # Unified testbench runner for Verilator and Icarus Verilog
 │
 ├── local/                                # Local working references & baseline specs (gitignored)
-├── Makefile                              # Master automation Makefile (Simulation, Lint, Synthesis)
 ├── .gitignore                            # Ignores build artifacts and local/ directory
 └── README.md                             # Repository root documentation (this file)
 ```
@@ -98,92 +97,94 @@ mt_npu/
 
 ---
 
-## 5. Master Makefile Usage Guide
+## 5. Dedicated Model Makefile Usage Guide
 
-The top-level [`Makefile`](file:///root/research/mt_npu/Makefile) provides unified commands for strict linting, Cadence Xcelium simulation, and Cadence Genus ASIC synthesis.
+Each of the three architectural exploration models is completely self-contained with its own dedicated [`Makefile`](file:///root/research/mt_npu/models/heterogeneous_fission/Makefile) located inside its respective directory:
+* [**`models/dataflow_switching/Makefile`**](file:///root/research/mt_npu/models/dataflow_switching/Makefile)
+* [**`models/spatial_fission/Makefile`**](file:///root/research/mt_npu/models/spatial_fission/Makefile)
+* [**`models/heterogeneous_fission/Makefile`**](file:///root/research/mt_npu/models/heterogeneous_fission/Makefile)
 
-### 5.1 Command Reference Summary
+---
 
-| Target | Description | Default Options |
+### 5.1 Standard Targets Available in Each Model
+
+Navigate into any model directory (`cd models/<model_name>`) and run:
+
+| Target | Description | Options |
 | :--- | :--- | :--- |
-| `make lint` | Run strict Verilator linting (`--lint-only -Wall`) across all 3 models | Strict `-Wall`, `--timing` |
-| `make run-all` | Run Cadence Xcelium (`xrun`) simulations for all 3 models sequentially | `GUI=1` (SimVision GUI) |
-| `make run-all GUI=0` | Run Cadence Xcelium (`xrun`) simulations in headless batch mode | Batch mode |
-| `make run-model1` | Run Model 1 (Dataflow Switching) simulation with Xcelium | `GUI=1` (or `GUI=0`) |
-| `make run-model2` | Run Model 2 (Spatial Fission) simulation with Xcelium | `GUI=1` (or `GUI=0`) |
-| `make run-model3` | Run Model 3 (Heterogeneous Fission / PolyFlow-NPU) simulation | `GUI=1` (or `GUI=0`) |
-| `make synth-all` | Run Cadence Genus logic synthesis across all 3 models sequentially | Generates netlists & reports |
-| `make synth-model1` | Run Cadence Genus synthesis for Model 1 (`dfs_top`) | Reports: timing, area, power |
-| `make synth-model2` | Run Cadence Genus synthesis for Model 2 (`sfa_top`) | Reports: timing, area, power |
-| `make synth-model3` | Run Cadence Genus synthesis for Model 3 (`hdf_top`) | Reports: timing, area, power |
-| `make clean` | Remove all compile databases, waveform dumps, and logs | Full cleanup |
-| `make help` | Display detailed interactive target help menu | — |
+| `make lint` | Run strict Verilator linting (`--lint-only -Wall`) on the model's RTL and TB | Strict `-Wall`, `--timing` |
+| `make run` | Launch Cadence Xcelium (`xrun`) simulation with SimVision GUI | `GUI=1` (Default) |
+| `make run GUI=0` | Run Cadence Xcelium (`xrun`) simulation in headless batch mode | Batch / CI mode |
+| `make synth` | Run Cadence Genus ASIC logic synthesis mapped to target library (`slow.lib`) | Generates netlist & reports |
+| `make clean` | Clean up all simulation sandboxes, waveform databases (`waves.shm`), and reports | Full model cleanup |
+| `make help` | Display interactive target help menu | — |
 
 ---
 
-### 5.2 Strict Verilator Linting
-Ensure 100% syntactic and semantic cleanliness across all models before running synthesis or simulation:
+### 5.2 Step-by-Step Usage per Model
+
+#### Model 1: Single-Tenant Dataflow Switching
 ```bash
+cd models/dataflow_switching
+
+# 1. Strict lint check:
 make lint
+
+# 2. Simulate with Cadence Xcelium (interactive GUI or batch):
+make run GUI=1      # SimVision GUI
+make run GUI=0      # Command-line batch
+
+# 3. Synthesize with Cadence Genus:
+make synth          # Produces timing_dfs.rpt, area_dfs.rpt, power_dfs.rpt, and dfs_top_netlist.v
+
+# 4. Clean artifacts:
+make clean
 ```
-* **Command Executed**: `verilator --lint-only -Wall --timing <model>/rtl/*.sv <model>/tb/*.sv`
-* **Checks Enforced**: Unconnected ports, unused signals, implicit net definitions, bit-width truncations, and combinational loops.
 
----
-
-### 5.3 Simulation with Cadence Xcelium (`xrun`)
-Simulate individual models or the complete suite using Cadence Xcelium:
-
+#### Model 2: Homogeneous Spatial Fission
 ```bash
-# 1. Run all 3 models in batch mode (for CI / automated testing):
-make run-all GUI=0
+cd models/spatial_fission
 
-# 2. Run all 3 models with SimVision GUI enabled (for waveform inspection):
-make run-all GUI=1
+# 1. Strict lint check:
+make lint
 
-# 3. Run individual models:
-make run-model1 GUI=0   # Model 1: Dataflow Switching (dfs_top)
-make run-model2 GUI=0   # Model 2: Spatial Fission (sfa_top)
-make run-model3 GUI=0   # Model 3: Heterogeneous Fission (hdf_top / PolyFlow-NPU)
+# 2. Simulate with Cadence Xcelium:
+make run GUI=1      # SimVision GUI
+make run GUI=0      # Command-line batch
+
+# 3. Synthesize with Cadence Genus:
+make synth          # Produces timing_sfa.rpt, area_sfa.rpt, power_sfa.rpt, and sfa_top_netlist.v
+
+# 4. Clean artifacts:
+make clean
 ```
-* **Sandbox Execution**: Each model creates its own isolated sandbox directory (`output/`), compiling with `-access +rwc` and logging to `output/xrun.log`.
 
----
-
-### 5.4 Logic Synthesis with Cadence Genus
-Synthesize RTL into optimized gate-level netlists mapped to the target technology library (`slow.lib`):
-
+#### Model 3: Heterogeneous Fission (PolyFlow-NPU)
 ```bash
-# 1. Synthesize all models sequentially:
-make synth-all
+cd models/heterogeneous_fission
 
-# 2. Synthesize individual models:
-make synth-model1   # Synthesize dfs_top (produces timing_dfs.rpt, area_dfs.rpt, power_dfs.rpt)
-make synth-model2   # Synthesize sfa_top (produces timing_sfa.rpt, area_sfa.rpt, power_sfa.rpt)
-make synth-model3   # Synthesize hdf_top (produces timing_hdf.rpt, area_hdf.rpt, power_hdf.rpt)
+# 1. Strict lint check:
+make lint
+
+# 2. Simulate with Cadence Xcelium:
+make run GUI=1      # SimVision GUI
+make run GUI=0      # Command-line batch
+
+# 3. Synthesize with Cadence Genus:
+make synth          # Produces timing_hdf.rpt, area_hdf.rpt, power_hdf.rpt, and hdf_top_netlist.v
+
+# 4. Clean artifacts:
+make clean
 ```
-* **Generated Synthesis Artifacts**:
-  - Gate-level Verilog netlist: `*_netlist.v`
-  - Post-synthesis constraints: `*_netlist.sdc`
-  - Standard Delay Format timing back-annotation: `*_netlist.sdf`
-  - Comprehensive reports: `timing_*.rpt`, `area_*.rpt`, `power_*.rpt`, `qor_*.rpt`
 
 ---
 
-### 5.5 Open-Source Simulation Alternative (Verilator & Icarus)
-If running on an environment without Cadence licenses, execute the unified testbench runner:
+### 5.3 Batch Multi-Model Simulation Script (Verilator & Icarus)
+If you wish to simulate all three models sequentially from the repository root without entering each folder:
 ```bash
 # High-speed native simulation with Verilator:
 ./scripts/run_all_models.sh verilator
 
 # Event-driven simulation with Icarus Verilog:
 ./scripts/run_all_models.sh iverilog
-```
-
----
-
-### 5.6 Cleaning Up Build Artifacts
-To delete all simulation logs, compile databases (`xcelium.d/`, `obj_dir/`), waveform databases (`waves.shm/`), and synthesis reports:
-```bash
-make clean
 ```

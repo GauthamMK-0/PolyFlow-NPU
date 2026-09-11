@@ -37,10 +37,16 @@ XRUN_FLAGS = -64bit \
 # ==============================================================================
 # Targets
 # ==============================================================================
-.PHONY: all run clean help
+.PHONY: all run clean help lint synth
 
 # Default target when you just type 'make'
 all: run
+
+lint:
+	@echo "=================================================================="
+	@echo "Running Verilator Strict Linting for Model 3 (hdf_top)"
+	@echo "=================================================================="
+	verilator --lint-only -Wall --timing $(SRC_FILES)
 
 run:
 	@echo "=================================================================="
@@ -65,6 +71,7 @@ clean:
 
 help:
 	@echo "Available Makefile targets:"
+	@echo "  make lint        - Run strict Verilator linting (--lint-only -Wall)"
 	@echo "  make run         - Run simulation with GUI enabled (default)"
 	@echo "  make run GUI=0   - Run simulation in batch/command-line mode"
 	@echo "  make synth       - Run Cadence Genus logic synthesis using synth_hdf.tcl"
