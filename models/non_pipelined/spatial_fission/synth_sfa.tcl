@@ -1,5 +1,5 @@
 # ==============================================================================
-# Cadence Genus Synthesis TCL Script for SFA Top Module (Model 2: Spatial Fission)
+# Cadence Genus Synthesis TCL Script for SFA Top (Model 2: Non-Pipelined Baseline)
 # ==============================================================================
 
 # --- Design & Path Configurations ---

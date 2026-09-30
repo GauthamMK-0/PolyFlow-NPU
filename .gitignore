@@ -12,8 +12,6 @@ xrun.history
 fv/
 genus.cmd*
 genus.log*
-*_netlist.*
-*.sdf
 
 *.o
 *.d

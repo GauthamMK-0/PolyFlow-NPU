@@ -1,5 +1,5 @@
 # ==============================================================================
-# Cadence Genus Synthesis TCL Script for HDF Top Module (Model 3: Heterogeneous Fission)
+# Cadence Genus Synthesis TCL Script for HDF Top (Model 3: Non-Pipelined Baseline)
 # ==============================================================================
 
 # --- Design & Path Configurations ---

@@ -1,5 +1,5 @@
 # ==============================================================================
-# Cadence Genus Synthesis TCL Script for DFS Top Module (Model 1)
+# Cadence Genus Synthesis TCL Script for DFS Top (Model 1: Pipelined Variant)
 # ==============================================================================
 
 # --- Design & Path Configurations ---
