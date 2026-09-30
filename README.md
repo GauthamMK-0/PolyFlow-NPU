@@ -25,13 +25,13 @@ Each dynamically partitioned region independently selects its mathematically opt
 
 ## 2. The Three Architectural Exploration Models
 
-To isolate, evaluate, and benchmark each contribution systematically, this repository provides three self-contained models:
+To isolate, evaluate, and benchmark each contribution systematically, this repository provides three self-contained models across both **Pipelined** (single-cycle clocked MAC accumulation with gating & operand clamping) and **Non-Pipelined** (pure combinational MAC baseline) variants:
 
 | Model Folder | Architectural Configuration | Multi-Tenancy | Per-Region Dataflow | Key Workload Fit |
 |---|---|:---:|:---:|---|
-| [**`models/dataflow_switching/`**](file:///root/research/mt_npu/models/dataflow_switching) | **Configuration B**<br/>*(ReDas Baseline)* | Single Tenant Only | Global WS ⇄ OS ⇄ IS | Single-model sequential layer execution |
-| [**`models/spatial_fission/`**](file:///root/research/mt_npu/models/spatial_fission) | **Configuration A**<br/>*(Planaria Baseline)* | Multi-Tenant (Region A + B) | Rigidly Locked to WS | Concurrent CNN workloads |
-| [**`models/heterogeneous_fission/`**](file:///root/research/mt_npu/models/heterogeneous_fission) | **Configuration C**<br/>*(Novel Proposed Idea)* | **Multi-Tenant (Region A + B)** | **Independent Runtime WS / OS / IS** | **Simultaneous CNN (WS) + Transformer (OS) co-execution** |
+| [**`models/pipelined/dataflow_switching/`**](file:///root/research/mt_npu/models/pipelined/dataflow_switching) | **Configuration B**<br/>*(ReDas Baseline)* | Single Tenant Only | Global WS ⇄ OS ⇄ IS | Single-model sequential layer execution |
+| [**`models/pipelined/spatial_fission/`**](file:///root/research/mt_npu/models/pipelined/spatial_fission) | **Configuration A**<br/>*(Planaria Baseline)* | Multi-Tenant (Region A + B) | Rigidly Locked to WS | Concurrent CNN workloads |
+| [**`models/pipelined/heterogeneous_fission/`**](file:///root/research/mt_npu/models/pipelined/heterogeneous_fission) | **Configuration C**<br/>*(Novel Proposed Idea)* | **Multi-Tenant (Region A + B)** | **Independent Runtime WS / OS / IS** | **Simultaneous CNN (WS) + Transformer (OS) co-execution** |
 
 ---
 
@@ -46,36 +46,31 @@ mt_npu/
 │   ├── figB_seq_switch.png               # Configuration B: Sequential Dataflow Switching Pod
 │   └── figC_hetero_fission.png           # Configuration C: Heterogeneous Fission Pod
 │
-├── models/                               # Self-contained architectural models
-│   ├── dataflow_switching/               # [Model 1] Single-tenant runtime switching
-│   │   ├── rtl/                          # Hardware RTL (dfs_pe, dfs_array, dfs_top)
-│   │   ├── tb/                           # Standalone SystemVerilog testbench (dfs_top_tb.sv)
-│   │   ├── dfs_top.sdc                   # SDC timing constraints (1.0 GHz target)
-│   │   ├── synth_dfs.tcl                 # Cadence Genus synthesis TCL script
-│   │   ├── Makefile                      # Cadence Xcelium simulation & Genus synthesis Makefile
-│   │   ├── architecture.md               # Detailed microarchitecture specification
-│   │   └── README.md                     # Model-specific guide
+├── models/                               # Architectural exploration models
+│   ├── pipelined/                        # [Pipelined Models] Clocked single-cycle MAC accumulation & power gating
+│   │   ├── dataflow_switching/           # [Model 1] Single-tenant runtime switching
+│   │   │   ├── rtl/                      # Hardware RTL (dfs_pe, dfs_array, dfs_top)
+│   │   │   ├── tb/                       # Standalone SystemVerilog testbench (dfs_top_tb.sv)
+│   │   │   ├── Makefile                  # Cadence Xcelium simulation & Genus synthesis Makefile
+│   │   │   └── ...
+│   │   ├── spatial_fission/              # [Model 2] Homogeneous spatial multi-tenancy
+│   │   │   ├── rtl/                      # Hardware RTL (sfa_pe, sfa_array, sfa_fission_dec, etc.)
+│   │   │   ├── tb/                       # Standalone SystemVerilog testbench (sfa_top_tb.sv)
+│   │   │   ├── Makefile                  # Cadence Xcelium simulation & Genus synthesis Makefile
+│   │   │   └── ...
+│   │   └── heterogeneous_fission/        # [Model 3] Novel Heterogeneous Fission (PolyFlow-NPU)
+│   │       ├── rtl/                      # Hardware RTL (hdf_pe, hdf_array_grid, hdf_fission_dec, etc.)
+│   │       ├── tb/                       # Standalone SystemVerilog testbench (hdf_top_tb.sv)
+│   │       ├── Makefile                  # Cadence Xcelium simulation & Genus synthesis Makefile
+│   │       └── ...
 │   │
-│   ├── spatial_fission/                  # [Model 2] Homogeneous spatial multi-tenancy
-│   │   ├── rtl/                          # Hardware RTL (sfa_pe, sfa_array, sfa_fission_dec, sfa_eppa, etc.)
-│   │   ├── tb/                           # Standalone SystemVerilog testbench (sfa_top_tb.sv)
-│   │   ├── sfa_top.sdc                   # SDC timing constraints (1.0 GHz target)
-│   │   ├── synth_sfa.tcl                 # Cadence Genus synthesis TCL script
-│   │   ├── Makefile                      # Cadence Xcelium simulation & Genus synthesis Makefile
-│   │   ├── architecture.md               # Detailed microarchitecture specification
-│   │   └── README.md                     # Model-specific guide
-│   │
-│   └── heterogeneous_fission/            # [Model 3] Novel Heterogeneous Fission (PolyFlow-NPU)
-│       ├── rtl/                          # Hardware RTL (hdf_pe, hdf_array_grid, hdf_fission_dec, etc.)
-│       ├── tb/                           # Standalone SystemVerilog testbench (hdf_top_tb.sv)
-│       ├── hdf_top.sdc                   # SDC timing constraints (1.0 GHz target)
-│       ├── synth_hdf.tcl                 # Cadence Genus synthesis TCL script
-│       ├── Makefile                      # Cadence Xcelium simulation & Genus synthesis Makefile
-│       ├── architecture.md               # Detailed microarchitecture specification
-│       └── README.md                     # Model-specific guide
+│   └── non_pipelined/                    # [Non-Pipelined Models] Baseline combinational MAC without accumulator registers
+│       ├── dataflow_switching/           # Baseline Model 1 with combinational MAC
+│       ├── spatial_fission/              # Baseline Model 2 with combinational MAC
+│       └── heterogeneous_fission/        # Baseline Model 3 with combinational MAC
 │
 ├── scripts/
-│   └── run_all_models.sh                 # Unified testbench runner for Verilator and Icarus Verilog
+│   └── run_all_models.sh                 # Unified testbench runner (supports pipelined, non_pipelined, or all)
 │
 ├── local/                                # Local working references & baseline specs (gitignored)
 ├── .gitignore                            # Ignores build artifacts and local/ directory
@@ -99,16 +94,16 @@ mt_npu/
 
 ## 5. Dedicated Model Makefile Usage Guide
 
-Each of the three architectural exploration models is completely self-contained with its own dedicated [`Makefile`](file:///root/research/mt_npu/models/heterogeneous_fission/Makefile) located inside its respective directory:
-* [**`models/dataflow_switching/Makefile`**](file:///root/research/mt_npu/models/dataflow_switching/Makefile)
-* [**`models/spatial_fission/Makefile`**](file:///root/research/mt_npu/models/spatial_fission/Makefile)
-* [**`models/heterogeneous_fission/Makefile`**](file:///root/research/mt_npu/models/heterogeneous_fission/Makefile)
+Each of the architectural models is completely self-contained with its own dedicated Makefile located inside its respective directory under `models/pipelined/` and `models/non_pipelined/`:
+* [**`models/pipelined/dataflow_switching/Makefile`**](file:///root/research/mt_npu/models/pipelined/dataflow_switching/Makefile)
+* [**`models/pipelined/spatial_fission/Makefile`**](file:///root/research/mt_npu/models/pipelined/spatial_fission/Makefile)
+* [**`models/pipelined/heterogeneous_fission/Makefile`**](file:///root/research/mt_npu/models/pipelined/heterogeneous_fission/Makefile)
 
 ---
 
 ### 5.1 Standard Targets Available in Each Model
 
-Navigate into any model directory (`cd models/<model_name>`) and run:
+Navigate into any model directory (`cd models/pipelined/<model_name>` or `cd models/non_pipelined/<model_name>`) and run:
 
 | Target | Description | Options |
 | :--- | :--- | :--- |
@@ -127,7 +122,7 @@ Navigate into any model directory (`cd models/<model_name>`) and run:
 
 #### Model 1: Single-Tenant Dataflow Switching
 ```bash
-cd models/dataflow_switching
+cd models/pipelined/dataflow_switching
 
 # 1. Lint checks (Verilator or Cadence HAL):
 make lint-verilator # Strict Verilator -Wall lint
@@ -146,7 +141,7 @@ make clean
 
 #### Model 2: Homogeneous Spatial Fission
 ```bash
-cd models/spatial_fission
+cd models/pipelined/spatial_fission
 
 # 1. Lint checks (Verilator or Cadence HAL):
 make lint-verilator # Strict Verilator -Wall lint
@@ -165,7 +160,7 @@ make clean
 
 #### Model 3: Heterogeneous Fission (PolyFlow-NPU)
 ```bash
-cd models/heterogeneous_fission
+cd models/pipelined/heterogeneous_fission
 
 # 1. Lint checks (Verilator or Cadence HAL):
 make lint-verilator # Strict Verilator -Wall lint
@@ -185,11 +180,17 @@ make clean
 ---
 
 ### 5.3 Batch Multi-Model Simulation Script (Verilator & Icarus)
-If you wish to simulate all three models sequentially from the repository root without entering each folder:
+If you wish to simulate all models sequentially from the repository root:
 ```bash
-# High-speed native simulation with Verilator:
-./scripts/run_all_models.sh verilator
+# Run both pipelined and non-pipelined suites (all 6 models):
+./scripts/run_all_models.sh verilator all
+
+# Run only the pipelined models:
+./scripts/run_all_models.sh verilator pipelined
+
+# Run only the non-pipelined baseline models:
+./scripts/run_all_models.sh verilator non_pipelined
 
 # Event-driven simulation with Icarus Verilog:
-./scripts/run_all_models.sh iverilog
+./scripts/run_all_models.sh iverilog all
 ```
