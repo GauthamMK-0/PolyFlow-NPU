@@ -63,6 +63,16 @@ run-model3:
 
 run-all: run-model1 run-model2 run-model3
 
+# --- Optional GUI Shortcuts (SimVision) ---
+gui-model1:
+	@$(MAKE) run-model1 GUI=1 TEST=$(TEST)
+
+gui-model2:
+	@$(MAKE) run-model2 GUI=1 TEST=$(TEST)
+
+gui-model3:
+	@$(MAKE) run-model3 GUI=1 TEST=$(TEST)
+
 # --- Cadence Genus Synthesis Targets ---
 synth-model1:
 	@$(MAKE) -C models/$(MODEL_VARIANT)/dataflow_switching synth
