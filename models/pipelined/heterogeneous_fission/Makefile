@@ -34,6 +34,7 @@ TEST ?= ALL
 XRUN_FLAGS = -64bit \
              -sv \
              -access +rwc \
+             -top hdf_top_tb \
              -incdir ../tb \
              -incdir ../tb/tests \
              +TEST=$(TEST) \
