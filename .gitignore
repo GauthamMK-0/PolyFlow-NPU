@@ -2,6 +2,8 @@
 *.vvp
 *.vcd
 *.log
+*.dat
+*.info
 obj_dir/
 # Cadence simulation & synthesis artifacts
 output/
