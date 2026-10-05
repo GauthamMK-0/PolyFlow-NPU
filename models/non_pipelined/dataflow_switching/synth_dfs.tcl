@@ -48,10 +48,11 @@ report_area   > reports/area_dfs.rpt
 report_qor    > reports/qor_dfs.rpt
 
 # --- Netlist & Gate-Level Files Generation ---
-write_hdl > dfs_top_netlist.v
-write_sdc > dfs_top_netlist.sdc
-write_sdf -timescale ns -nonegchecks -recrem split -edges check_edge -setuphold split > dfs_top_netlist.sdf
+file mkdir netlist
+write_hdl > netlist/dfs_top_netlist.v
+write_sdc > netlist/dfs_top_netlist.sdc
+write_sdf -timescale ns -nonegchecks -recrem split -edges check_edge -setuphold split > netlist/dfs_top_netlist.sdf
 
 puts "=================================================================="
-puts " Genus Synthesis Finished Successfully! Check reports for details."
+puts " Genus Synthesis Finished Successfully! Check reports/ and netlist/ for details."
 puts "=================================================================="

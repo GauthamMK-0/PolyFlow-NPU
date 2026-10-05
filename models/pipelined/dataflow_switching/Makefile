@@ -71,8 +71,8 @@ synth:
 	genus -f synth_dfs.tcl -log genus_dfs.log
 
 clean:
-	@echo "Cleaning up all simulation logs, compile databases, and synthesis reports..."
-	rm -rf $(OUT_DIR) xcelium.d waves.shm .simvision xrun.history xrun.log genus* fv/ *.rpt *_netlist.* reports/
+	@echo "Cleaning up all simulation logs, compile databases, synthesis reports, and netlists..."
+	rm -rf $(OUT_DIR) xcelium.d waves.shm .simvision xrun.history xrun.log genus* fv/ *.rpt *_netlist.* reports/ netlist/
 
 help:
 	@echo "Available Makefile targets:"

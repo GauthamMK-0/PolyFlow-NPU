@@ -56,10 +56,11 @@ report_area   > reports/area_sfa.rpt
 report_qor    > reports/qor_sfa.rpt
 
 # --- Netlist & Gate-Level Files Generation ---
-write_hdl > sfa_top_netlist.v
-write_sdc > sfa_top_netlist.sdc
-write_sdf -timescale ns -nonegchecks -recrem split -edges check_edge -setuphold split > sfa_top_netlist.sdf
+file mkdir netlist
+write_hdl > netlist/sfa_top_netlist.v
+write_sdc > netlist/sfa_top_netlist.sdc
+write_sdf -timescale ns -nonegchecks -recrem split -edges check_edge -setuphold split > netlist/sfa_top_netlist.sdf
 
 puts "=================================================================="
-puts " Genus Synthesis Finished Successfully! Check reports for details."
+puts " Genus Synthesis Finished Successfully! Check reports/ and netlist/ for details."
 puts "=================================================================="
