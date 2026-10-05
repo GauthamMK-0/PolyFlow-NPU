@@ -110,86 +110,49 @@ Navigate into any model directory (`cd models/pipelined/<model_name>` or `cd mod
 | `make lint-verilator` | Run strict Verilator linting (`--lint-only -Wall`) on the model's RTL and TB | Strict `-Wall`, `--timing` |
 | `make lint-cadence` | Run Cadence HAL linting on the model's RTL and TB | Cadence environment |
 | `make lint` | Run default lint check (aliases to `lint-verilator`) | — |
-| `make run` | Launch Cadence Xcelium (`xrun`) simulation with SimVision GUI | `GUI=1` (Default) |
-| `make run GUI=0` | Run Cadence Xcelium (`xrun`) simulation in headless batch mode | Batch / CI mode |
+| `make run` | Launch Cadence Xcelium (`xrun`) simulation with SimVision GUI | `GUI=1` (Default), `TEST=ALL` |
+| `make run GUI=0` | Run Cadence Xcelium (`xrun`) simulation in headless batch mode | Batch / CI mode, `TEST=ALL` |
+| `make run GUI=0 TEST=ws` | Run specific targeted testcase in Cadence Xcelium | `TEST=ws`, `os`, `is`, `split`, `coexec` |
 | `make synth` | Run Cadence Genus ASIC logic synthesis mapped to target library (`slow.lib`) | Generates netlist & reports |
 | `make clean` | Clean up all simulation sandboxes, waveform databases (`waves.shm`), and reports | Full model cleanup |
 | `make help` | Display interactive target help menu | — |
 
 ---
 
-### 5.2 Step-by-Step Usage per Model
+### 5.2 Top-Level Master Automation (Repository Root)
 
-#### Model 1: Single-Tenant Dataflow Switching
+A top-level [`Makefile`](file:///root/research/mt_npu/Makefile) is provided at the repository root to automate the entire Cadence and linting workflow across all models:
+
 ```bash
-cd models/pipelined/dataflow_switching
+# 1. Strict linting across all 6 models:
+make lint
 
-# 1. Lint checks (Verilator or Cadence HAL):
-make lint-verilator # Strict Verilator -Wall lint
-make lint-cadence   # Cadence HAL lint
+# 2. Cadence Xcelium Simulation:
+make run-model1 GUI=0               # Model 1: Dataflow Switching (Single-Tenant)
+make run-model2 GUI=0               # Model 2: Spatial Fission (Homogeneous WS)
+make run-model3 GUI=0               # Model 3: Heterogeneous Fission (PolyFlow-NPU)
+make run-model3 GUI=0 TEST=coexec   # Run targeted testcase on Model 3
+make run-all GUI=0                  # Run all models sequentially
 
-# 2. Simulate with Cadence Xcelium (interactive GUI or batch):
-make run GUI=1      # SimVision GUI
-make run GUI=0      # Command-line batch
-
-# 3. Synthesize with Cadence Genus:
-make synth          # Produces reports/ (timing, area, power) and netlist/dfs_top_netlist.v
-
-# 4. Clean artifacts:
-make clean
-```
-
-#### Model 2: Homogeneous Spatial Fission
-```bash
-cd models/pipelined/spatial_fission
-
-# 1. Lint checks (Verilator or Cadence HAL):
-make lint-verilator # Strict Verilator -Wall lint
-make lint-cadence   # Cadence HAL lint
-
-# 2. Simulate with Cadence Xcelium:
-make run GUI=1      # SimVision GUI
-make run GUI=0      # Command-line batch
-
-# 3. Synthesize with Cadence Genus:
-make synth          # Produces reports/ (timing, area, power) and netlist/sfa_top_netlist.v
-
-# 4. Clean artifacts:
-make clean
-```
-
-#### Model 3: Heterogeneous Fission (PolyFlow-NPU)
-```bash
-cd models/pipelined/heterogeneous_fission
-
-# 1. Lint checks (Verilator or Cadence HAL):
-make lint-verilator # Strict Verilator -Wall lint
-make lint-cadence   # Cadence HAL lint
-
-# 2. Simulate with Cadence Xcelium:
-make run GUI=1      # SimVision GUI
-make run GUI=0      # Command-line batch
-
-# 3. Synthesize with Cadence Genus:
-make synth          # Produces reports/ (timing, area, power) and netlist/hdf_top_netlist.v
-
-# 4. Clean artifacts:
-make clean
+# 3. Cadence Genus Logic Synthesis:
+make synth-model1                   # Synthesize dfs_top (generates netlist/ & reports/)
+make synth-model2                   # Synthesize sfa_top (generates netlist/ & reports/)
+make synth-model3                   # Synthesize hdf_top (generates netlist/ & reports/)
+make synth-all                      # Synthesize all models sequentially
 ```
 
 ---
 
-### 5.3 Batch Multi-Model Simulation Script (Verilator & Icarus)
+### 5.3 Batch Multi-Model Simulation Script (Verilator, Icarus & Cadence Xcelium)
 If you wish to simulate all models sequentially from the repository root:
 ```bash
-# Run both pipelined and non-pipelined suites (all 6 models):
+# High-speed C++ cycle-accurate simulation with Verilator:
 ./scripts/run_all_models.sh verilator all
+./scripts/run_all_models.sh verilator pipelined ws   # Run only WS testcase
 
-# Run only the pipelined models:
-./scripts/run_all_models.sh verilator pipelined
-
-# Run only the non-pipelined baseline models:
-./scripts/run_all_models.sh verilator non_pipelined
+# Industry-standard ASIC simulation with Cadence Xcelium:
+./scripts/run_all_models.sh xrun all
+./scripts/run_all_models.sh xrun pipelined coexec   # Run specific testcase
 
 # Event-driven simulation with Icarus Verilog:
 ./scripts/run_all_models.sh iverilog all

@@ -35,6 +35,7 @@ XRUN_FLAGS = -64bit \
              -sv \
              -access +rwc \
              -incdir ../tb \
+             -incdir ../tb/tests \
              +TEST=$(TEST) \
              $(GUI_FLAGS) \
              -l xrun.log
@@ -54,13 +55,13 @@ lint-verilator:
 	@echo "=================================================================="
 	@echo "Running Verilator Strict Linting for Model 2 (sfa_top)"
 	@echo "=================================================================="
-	verilator --lint-only -Wall --timing $(SRC_FILES)
+	verilator --lint-only -Wall --timing -I$(TB_DIR) $(SRC_FILES)
 
 lint-cadence:
 	@echo "=================================================================="
 	@echo "Running Cadence HAL / Xcelium Linting for Model 2 (sfa_top)"
 	@echo "=================================================================="
-	hal $(SRC_FILES)
+	hal -incdir $(TB_DIR) $(SRC_FILES)
 
 run:
 	@echo "=================================================================="
