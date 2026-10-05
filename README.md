@@ -110,9 +110,10 @@ Navigate into any model directory (`cd models/pipelined/<model_name>` or `cd mod
 | `make lint-verilator` | Run strict Verilator linting (`--lint-only -Wall`) on the model's RTL and TB | Strict `-Wall`, `--timing` |
 | `make lint-cadence` | Run Cadence HAL linting on the model's RTL and TB | Cadence environment |
 | `make lint` | Run default lint check (aliases to `lint-verilator`) | — |
-| `make run` | Launch Cadence Xcelium (`xrun`) simulation with SimVision GUI | `GUI=1` (Default), `TEST=ALL` |
-| `make run GUI=0` | Run Cadence Xcelium (`xrun`) simulation in headless batch mode | Batch / CI mode, `TEST=ALL` |
-| `make run GUI=0 TEST=ws` | Run specific targeted testcase in Cadence Xcelium | `TEST=ws`, `os`, `is`, `split`, `coexec` |
+| `make run` | Launch Cadence Xcelium (`xrun`) simulation in headless batch mode | Default (`GUI=0`), `TEST=ALL` |
+| `make gui` | Launch Cadence Xcelium (`xrun`) simulation with SimVision GUI | `GUI=1` (Interactive) |
+| `make run GUI=1` | Launch Cadence Xcelium with SimVision GUI | `GUI=1` |
+| `make run TEST=ws` | Run specific targeted testcase in Cadence Xcelium | `TEST=ws`, `os`, `is`, `split`, `coexec` |
 | `make synth` | Run Cadence Genus ASIC logic synthesis mapped to target library (`slow.lib`) | Generates netlist & reports |
 | `make clean` | Clean up all simulation sandboxes, waveform databases (`waves.shm`), and reports | Full model cleanup |
 | `make help` | Display interactive target help menu | — |
@@ -127,12 +128,16 @@ A top-level [`Makefile`](file:///root/research/mt_npu/Makefile) is provided at t
 # 1. Strict linting across all 6 models:
 make lint
 
-# 2. Cadence Xcelium Simulation:
-make run-model1 GUI=0               # Model 1: Dataflow Switching (Single-Tenant)
-make run-model2 GUI=0               # Model 2: Spatial Fission (Homogeneous WS)
-make run-model3 GUI=0               # Model 3: Heterogeneous Fission (PolyFlow-NPU)
-make run-model3 GUI=0 TEST=coexec   # Run targeted testcase on Model 3
-make run-all GUI=0                  # Run all models sequentially
+# 2. Cadence Xcelium Simulation (Headless batch mode by default):
+make run-model1                     # Model 1: Dataflow Switching (Single-Tenant)
+make run-model2                     # Model 2: Spatial Fission (Homogeneous WS)
+make run-model3                     # Model 3: Heterogeneous Fission (PolyFlow-NPU)
+make run-model3 TEST=coexec         # Run targeted testcase on Model 3
+make run-all                        # Run all models sequentially
+
+# 2b. Optional Interactive GUI Mode (SimVision):
+make gui-model3                     # Launch Model 3 in SimVision GUI
+make run-model3 GUI=1               # Equivalent GUI invocation
 
 # 3. Cadence Genus Logic Synthesis:
 make synth-model1                   # Synthesize dfs_top (generates netlist/ & reports/)

@@ -36,25 +36,24 @@ models/spatial_fission/
 
 ### Using Cadence Xcelium (xrun)
 ```bash
-cd models/spatial_fission
-make run         # Interactive GUI mode with SimVision
-make run GUI=0   # Batch / headless mode
-make clean       # Clean output/ and log files
+cd models/non_pipelined/spatial_fission
+make run              # Headless batch mode (default)
+make gui              # Interactive GUI mode with SimVision
+make run TEST=split   # Run specific testcase
+make clean            # Clean output/ sandbox and log files
 ```
 
 ### Using Verilator
 ```bash
-cd models/spatial_fission
-verilator --binary --timing -Wall -Wno-fatal -Wno-DECLFILENAME \
-    rtl/sfa_pe.sv rtl/sfa_fission_decoder.sv rtl/sfa_array.sv \
-    rtl/sfa_otp_fsm.sv rtl/sfa_bank_scrub.sv rtl/sfa_eppa.sv rtl/sfa_top.sv \
-    tb/sfa_top_tb.sv --top-module sfa_top_tb -o Vsfa_top_tb
-./obj_dir/Vsfa_top_tb
+cd models/non_pipelined/spatial_fission
+verilator -j $(nproc) --binary --timing -Wall -Itb -Itb/tests \
+    rtl/*.sv tb/sfa_top_tb.sv --top-module sfa_top_tb -o Vsfa_top_tb
+./obj_dir/Vsfa_top_tb +TEST=ALL
 ```
 
 ### Using Icarus Verilog (Alternative)
 ```bash
-cd models/spatial_fission
-iverilog -g2012 -o tb/sfa_top_tb.vvp rtl/*.sv tb/sfa_top_tb.sv
-vvp tb/sfa_top_tb.vvp
+cd models/non_pipelined/spatial_fission
+iverilog -g2012 -I tb -I tb/tests -o tb/sfa_top_tb.vvp rtl/*.sv tb/sfa_top_tb.sv
+vvp tb/sfa_top_tb.vvp +TEST=ALL
 ```

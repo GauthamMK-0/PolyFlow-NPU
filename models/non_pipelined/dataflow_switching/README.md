@@ -31,24 +31,24 @@ models/dataflow_switching/
 
 ### Using Cadence Xcelium (xrun)
 ```bash
-cd models/dataflow_switching
-make run         # Interactive GUI mode with SimVision
-make run GUI=0   # Batch / headless mode
-make clean       # Clean output/ and log files
+cd models/non_pipelined/dataflow_switching
+make run           # Headless batch mode (default)
+make gui           # Interactive GUI mode with SimVision
+make run TEST=ws   # Run specific testcase
+make clean         # Clean output/ sandbox and log files
 ```
 
 ### Using Verilator
 ```bash
-cd models/dataflow_switching
-verilator --binary --timing -Wall -Wno-fatal \
-    rtl/dfs_pe.sv rtl/dfs_array.sv rtl/dfs_top.sv tb/dfs_top_tb.sv \
-    --top-module dfs_top_tb -o Vdfs_top_tb
-./obj_dir/Vdfs_top_tb
+cd models/non_pipelined/dataflow_switching
+verilator -j $(nproc) --binary --timing -Wall -Itb -Itb/tests \
+    rtl/*.sv tb/dfs_top_tb.sv --top-module dfs_top_tb -o Vdfs_top_tb
+./obj_dir/Vdfs_top_tb +TEST=ALL
 ```
 
 ### Using Icarus Verilog (Alternative)
 ```bash
-cd models/dataflow_switching
-iverilog -g2012 -o tb/dfs_top_tb.vvp rtl/*.sv tb/dfs_top_tb.sv
-vvp tb/dfs_top_tb.vvp
+cd models/non_pipelined/dataflow_switching
+iverilog -g2012 -I tb -I tb/tests -o tb/dfs_top_tb.vvp rtl/*.sv tb/dfs_top_tb.sv
+vvp tb/dfs_top_tb.vvp +TEST=ALL
 ```

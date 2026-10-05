@@ -39,25 +39,24 @@ models/heterogeneous_fission/
 
 ### Using Cadence Xcelium (xrun)
 ```bash
-cd models/heterogeneous_fission
-make run         # Interactive GUI mode with SimVision
-make run GUI=0   # Batch / headless mode
-make clean       # Clean output/ and log files
+cd models/pipelined/heterogeneous_fission
+make run              # Headless batch mode (default)
+make gui              # Interactive GUI mode with SimVision
+make run TEST=coexec  # Run specific testcase
+make clean            # Clean output/ sandbox and log files
 ```
 
 ### Using Verilator
 ```bash
-cd models/heterogeneous_fission
-verilator --binary --timing -Wall -Wno-fatal -Wno-DECLFILENAME \
-    rtl/hdf_pe.sv rtl/hdf_fission_decoder.sv rtl/hdf_array_grid.sv \
-    rtl/eppa_arbiter.sv rtl/otp_token_fsm.sv rtl/pod_bank_scrub.sv rtl/hdf_top.sv \
-    tb/hdf_top_tb.sv --top-module hdf_top_tb -o Vhdf_top_tb
-./obj_dir/Vhdf_top_tb
+cd models/pipelined/heterogeneous_fission
+verilator -j $(nproc) --binary --timing -Wall -Itb -Itb/tests \
+    rtl/*.sv tb/hdf_top_tb.sv --top-module hdf_top_tb -o Vhdf_top_tb
+./obj_dir/Vhdf_top_tb +TEST=ALL
 ```
 
 ### Using Icarus Verilog (Alternative)
 ```bash
-cd models/heterogeneous_fission
-iverilog -g2012 -o tb/hdf_top_tb.vvp rtl/*.sv tb/hdf_top_tb.sv
-vvp tb/hdf_top_tb.vvp
+cd models/pipelined/heterogeneous_fission
+iverilog -g2012 -I tb -I tb/tests -o tb/hdf_top_tb.vvp rtl/*.sv tb/hdf_top_tb.sv
+vvp tb/hdf_top_tb.vvp +TEST=ALL
 ```
