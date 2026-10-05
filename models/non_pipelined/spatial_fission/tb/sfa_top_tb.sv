@@ -1,5 +1,5 @@
-// sfa_top_tb.sv — SystemVerilog Testbench for Homogeneous Spatial Fission Model
-// Validates dynamic spatial fission, boundary isolation, concurrent multi-tenancy, and memory safety.
+// sfa_top_tb.sv — SystemVerilog Hybrid Harness for Non-Pipelined Spatial Fission Model
+// Modular test dispatcher compatible with both Verilator and Cadence Xcelium.
 
 `timescale 1ns/1ps
 
@@ -57,18 +57,17 @@ module sfa_top_tb;
     /* verilator lint_on UNUSEDSIGNAL */
 
     int error_count = 0;
+    string target_test = "ALL";
 
     // Helper to read accumulator for PE at [row, col]
     function automatic logic signed [ACC_W-1:0] get_pe_acc(int r, int c);
         return acc_out_flat[(r*NUM_COLS + c)*ACC_W +: ACC_W];
     endfunction
 
-    // Helper to set din_w for Region A
     task automatic set_din_w_a(int r, logic [DATA_W-1:0] val);
         din_w_region_a[r*DATA_W +: DATA_W] = val;
     endtask
 
-    // Helper to set din_w for Region B
     task automatic set_din_w_b(int r, logic [DATA_W-1:0] val);
         din_w_region_b[r*DATA_W +: DATA_W] = val;
     endtask
@@ -151,118 +150,44 @@ module sfa_top_tb;
         step_clk();
     endtask
 
+    // --- Modular Test Inclusions (Hybrid Harness Pattern) ---
+    `include "tests/test_split_partition.svh"
+    `include "tests/test_concurrent_ws.svh"
+    `include "tests/test_eppa_phase_arb.svh"
+    `include "tests/test_mem_scrub.svh"
+
+    // --- Test Dispatcher & Regression Summary ---
     initial begin
+        void'($value$plusargs("TEST=%s", target_test));
+
         $display("================================================================");
-        $display(" [TESTSUITE] Starting Spatial Fission Model (Model 2) Tests");
+        $display(" [HYBRID HARNESS] Spatial Fission Model (Non-Pipelined)");
+        $display(" Target Test Selection: %s", target_test);
         $display("================================================================");
 
-        reset_dut();
-
-        // -------------------------------------------------------------
-        // TEST 1: Dispatch-Time Column Partitioning
-        // -------------------------------------------------------------
-        $display("\n--- [TEST 1] Dispatch-Time Column Split (Cols 0-1: A, Cols 2-3: B) ---");
-        cfg_split_col     = 4'd2;
-        cfg_update_strobe = 1;
-        step_clk();
-        cfg_update_strobe = 0;
-        step_clk();
-
-        $display("Region ID Mask = %b (Expected: 1100)", region_id_mask);
-        if (region_id_mask !== 4'b1100) begin
-            $display("ERROR: Split column decoding mismatch!");
-            error_count++;
-        end else begin
-            $display("PASS: Split column decoded properly.");
+        if (target_test == "ALL" || target_test == "split") begin
+            reset_dut();
+            run_test_split_partition();
         end
 
-        // -------------------------------------------------------------
-        // TEST 2: Concurrent Multi-Tenant WS Execution & Boundary Isolation
-        // -------------------------------------------------------------
-        $display("\n--- [TEST 2] Concurrent Execution: Region A & Region B (Both WS) ---");
-        // Clear accumulators in both regions
-        acc_clr = 2'b11;
-        step_clk();
-        acc_clr = 2'b00;
-
-        // Step 2.1: Preload weights into Region A (w=5) and Region B (w=7)
-        w_ld = 2'b11;
-        for (int r = 0; r < NUM_ROWS; r++) begin
-            set_din_w_a(r, 8'd5); // Region A weight = 5
-            set_din_w_b(r, 8'd7); // Region B weight = 7
-        end
-        step_clk();
-        w_ld = 2'b00;
-
-        // Step 2.2: Stream distinct activations: Region A (x=3), Region B (x=2)
-        compute_en = 2'b11;
-        for (int r = 0; r < NUM_ROWS; r++) begin
-            set_din_w_a(r, 8'd3); // Region A activation = 3
-            set_din_w_b(r, 8'd2); // Region B activation = 2
-        end
-        step_clk(); // Combinational product: Reg A = 5*3=15, Reg B = 7*2=14
-
-        $display("Region A (PE[0][0]) Product = %0d (Expected: 15)", get_pe_acc(0,0));
-        $display("Region B (PE[0][2]) Product = %0d (Expected: 14)", get_pe_acc(0,2));
-
-        if (get_pe_acc(0,0) !== 32'd15 || get_pe_acc(0,2) !== 32'd14) begin
-            $display("ERROR: Concurrent execution calculation mismatch!");
-            error_count++;
-        end else begin
-            $display("PASS: Both regions co-executed successfully with zero cross-talk (combinational).");
-        end
-        compute_en = 2'b00;
-
-        // -------------------------------------------------------------
-        // TEST 3: EPPA Memory Bandwidth Arbitration
-        // -------------------------------------------------------------
-        $display("\n--- [TEST 3] EPPA Memory Bandwidth Arbitration ---");
-        // Region A -> BURST (00), Region B -> STREAM (10)
-        phase_tag = {2'b10, 2'b00}; // [1]=Region B (STREAM), [0]=Region A (BURST)
-        step_clk();
-
-        $display("BW Alloc: Region A = 0x%0h (Exp: 0xFF), Region B = 0x%0h (Exp: 0x7F)",
-                 bw_alloc[0 +: BW_W], bw_alloc[BW_W +: BW_W]);
-
-        if (bw_alloc[0 +: BW_W] !== 8'hFF || bw_alloc[BW_W +: BW_W] !== 8'h7F) begin
-            $display("ERROR: EPPA bandwidth allocation mismatch!");
-            error_count++;
-        end else begin
-            $display("PASS: EPPA dynamic allocation verified.");
+        if (target_test == "ALL" || target_test == "concurrent") begin
+            reset_dut();
+            run_test_concurrent_ws();
         end
 
-        // -------------------------------------------------------------
-        // TEST 4: Shared Memory Bank Scrubbing & Ownership Transfer
-        // -------------------------------------------------------------
-        $display("\n--- [TEST 4] Shared Memory Scrubbing & Role Reassignment ---");
-        // Reassign Bank 1 to Region B with role 2'b01 (Input-Issuer)
-        role_reassign[1]          = 1'b1;
-        new_region_id_per_bank[1] = 1'b1; // Region B
-        new_role_per_bank[2 +: 2] = 2'b01;
-        step_clk();
-        role_reassign[1]          = 1'b0;
-
-        // Verify scrub active for 4 cycles
-        for (int i = 0; i < 3; i++) begin
-            $display("Bank 1 Scrub Cycle %0d: scrub_active = %b", i+1, scrub_active_bus[1]);
-            step_clk();
-        end
-        step_clk(); // Cycle 4 completes
-
-        $display("Bank 1 Scrub Completed: bank_role_clear = %b", bank_role_clear_bus[1]);
-        if (bank_role_clear_bus[1] !== 1'b1) begin
-            $display("ERROR: Expected bank_role_clear pulse upon scrub completion!");
-            error_count++;
-        end else begin
-            $display("PASS: Bank scrub zeroing sequence verified.");
+        if (target_test == "ALL" || target_test == "eppa") begin
+            reset_dut();
+            run_test_eppa_phase_arb();
         end
 
-        // -------------------------------------------------------------
-        // Summary
-        // -------------------------------------------------------------
+        if (target_test == "ALL" || target_test == "scrub") begin
+            reset_dut();
+            run_test_mem_scrub();
+        end
+
         $display("\n================================================================");
         if (error_count == 0) begin
-            $display(" [SUCCESS] ALL SPATIAL FISSION TESTS PASSED (Errors: 0)");
+            $display(" [SUCCESS] ALL EXECUTED SPATIAL FISSION TESTS PASSED (Errors: 0)");
             $display("================================================================");
             $finish(0);
         end else begin

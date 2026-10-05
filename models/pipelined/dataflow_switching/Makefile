@@ -23,10 +23,15 @@ else
     GUI_FLAGS =
 endif
 
+# Test selector (defaults to ALL, can pass TEST=ws, TEST=os, etc.)
+TEST ?= ALL
+
 # Common xrun flags
 XRUN_FLAGS = -64bit \
              -sv \
              -access +rwc \
+             -incdir ../tb \
+             +TEST=$(TEST) \
              $(GUI_FLAGS) \
              -l xrun.log
 

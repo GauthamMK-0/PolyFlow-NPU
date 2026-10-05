@@ -1,5 +1,5 @@
-// hdf_top_tb.sv — SystemVerilog Testbench for Novel Heterogeneous Fission Model (PolyFlow-NPU)
-// Verifies concurrent multi-tenant execution of CNN (Weight-Stationary) and Transformer Attention (Output-Stationary).
+// hdf_top_tb.sv — SystemVerilog Hybrid Harness for Non-Pipelined Heterogeneous Fission Model
+// Modular test dispatcher compatible with both Verilator and Cadence Xcelium.
 
 `timescale 1ns/1ps
 
@@ -59,6 +59,7 @@ module hdf_top_tb;
     wire  [NUM_COLS-1:0]                region_id_mask;
 
     int error_count = 0;
+    string target_test = "ALL";
 
     // Helper to read accumulator for PE at [row, col]
     function automatic logic signed [ACC_W-1:0] get_pe_acc(int r, int c);
@@ -160,134 +161,44 @@ module hdf_top_tb;
         step_clk();
     endtask
 
+    // --- Modular Test Inclusions (Hybrid Harness Pattern) ---
+    `include "tests/test_split_partition.svh"
+    `include "tests/test_hetero_coexec.svh"
+    `include "tests/test_eppa_phase_arb.svh"
+    `include "tests/test_mem_scrub_migration.svh"
+
+    // --- Test Dispatcher & Regression Summary ---
     initial begin
+        void'($value$plusargs("TEST=%s", target_test));
+
         $display("================================================================");
-        $display(" [TESTSUITE] Starting Heterogeneous Fission Model (Model 3) Tests");
+        $display(" [HYBRID HARNESS] Heterogeneous Fission Model (Non-Pipelined)");
+        $display(" Target Test Selection: %s", target_test);
         $display("================================================================");
 
-        reset_dut();
-
-        // -------------------------------------------------------------
-        // TEST 1: Dispatch-Time Column Partitioning
-        // -------------------------------------------------------------
-        $display("\n--- [TEST 1] Dispatch-Time Column Split (Cols 0-1: A, Cols 2-3: B) ---");
-        cfg_split_col     = 4'd2;
-        cfg_update_strobe = 1;
-        step_clk();
-        cfg_update_strobe = 0;
-        step_clk();
-
-        $display("Region ID Mask = %b (Expected: 1100)", region_id_mask);
-        if (region_id_mask !== 4'b1100) begin
-            $display("ERROR: Split column decoding mismatch!");
-            error_count++;
-        end else begin
-            $display("PASS: Split column decoded properly.");
+        if (target_test == "ALL" || target_test == "split") begin
+            reset_dut();
+            run_test_split_partition();
         end
 
-        // -------------------------------------------------------------
-        // TEST 2: Heterogeneous Co-Execution: Region A (WS) + Region B (OS)
-        // -------------------------------------------------------------
-        $display("\n--- [TEST 2] Heterogeneous Co-Execution: Region A (WS) + Region B (OS) ---");
-        // Clear accumulators in both regions
-        acc_clr = 2'b11;
-        dataflow_mode = {2'b01, 2'b00}; // Reg B: OS (01), Reg A: WS (00)
-        step_clk();
-        acc_clr = 2'b00;
-
-        // Step 2.1: Preload weights for Region A (WS) & initialize lifetime counter for both
-        w_ld[0]          = 1'b1;
-        lifetime_ld      = 2'b11;
-        lifetime_init    = {4'd15, 4'd15}; // 15 cycles lifetime for both regions
-        for (int r = 0; r < NUM_ROWS; r++) begin
-            set_din_w_a(r, 8'd5); // Region A stationary weight = 5
-        end
-        step_clk();
-        w_ld[0]     = 1'b0;
-        lifetime_ld = 2'b00;
-
-        // Step 2.2: Concurrent execution:
-        // Region A receives streaming activations from West: x_A = 3
-        // Region B receives Q from North and K from West simultaneously:
-        // Cycle 1: Q=4, K=7 -> Region B prod = 28; Region A prod = 5*3 = 15
-        for (int r = 0; r < NUM_ROWS; r++) set_din_w_a(r, 8'd3);
-        for (int c = 2; c < NUM_COLS; c++) set_din_n(c, 8'd4);  // Q into Region B cols 2-3
-        for (int r = 0; r < NUM_ROWS; r++) set_din_w_b(r, 8'd7); // K into Region B rows
-        step_clk();
-
-        $display("Cycle 1: Region A (WS Mode) Product = %0d (Expected: 15)", get_pe_acc(0,0));
-        $display("Cycle 1: Region B (OS Mode) Product = %0d (Expected: 28)", get_pe_acc(0,2));
-
-        if (get_pe_acc(0,0) !== 32'd15 || get_pe_acc(0,2) !== 32'd28) begin
-            $display("ERROR: Cycle 1 combinational mismatch!");
-            error_count++;
+        if (target_test == "ALL" || target_test == "coexec") begin
+            reset_dut();
+            run_test_hetero_coexec();
         end
 
-        // Cycle 2: Q=2, K=6 -> Region B prod = 12; Region A prod = 15
-        for (int r = 0; r < NUM_ROWS; r++) set_din_w_a(r, 8'd3);
-        for (int c = 2; c < NUM_COLS; c++) set_din_n(c, 8'd2);
-        for (int r = 0; r < NUM_ROWS; r++) set_din_w_b(r, 8'd6);
-        step_clk();
-
-        $display("Cycle 2: Region A (WS Mode) Product = %0d (Expected: 15)", get_pe_acc(0,0));
-        $display("Cycle 2: Region B (OS Mode) Product = %0d (Expected: 12)", get_pe_acc(0,2));
-
-        if (get_pe_acc(0,0) !== 32'd15 || get_pe_acc(0,2) !== 32'd12) begin
-            $display("ERROR: Heterogeneous co-execution calculation mismatch!");
-            error_count++;
-        end else begin
-            $display("PASS: Region A (WS) and Region B (OS) executed simultaneously with correct combinational mathematics!");
+        if (target_test == "ALL" || target_test == "eppa") begin
+            reset_dut();
+            run_test_eppa_phase_arb();
         end
 
-        // -------------------------------------------------------------
-        // TEST 3: Dynamic EPPA Phase Arbitration under Heterogeneous Loads
-        // -------------------------------------------------------------
-        $display("\n--- [TEST 3] EPPA Bandwidth Arbitration (WS BURST + OS STREAM) ---");
-        // Region A is in BURST (00), Region B is in STREAM (10)
-        phase_tag = {2'b10, 2'b00};
-        step_clk();
-
-        $display("BW Alloc: Region A (BURST) = 0x%0h (Exp: 0xFF), Region B (STREAM) = 0x%0h (Exp: 0x7F)",
-                 bw_alloc[0 +: BW_W], bw_alloc[BW_W +: BW_W]);
-
-        if (bw_alloc[0 +: BW_W] !== 8'hFF || bw_alloc[BW_W +: BW_W] !== 8'h7F) begin
-            $display("ERROR: EPPA bandwidth allocation mismatch!");
-            error_count++;
-        end else begin
-            $display("PASS: EPPA dynamic allocation correctly reflects heterogeneous memory phase profiles.");
+        if (target_test == "ALL" || target_test == "scrub") begin
+            reset_dut();
+            run_test_mem_scrub_migration();
         end
 
-        // -------------------------------------------------------------
-        // TEST 4: Shared Memory Ownership Migration with Mandatory Scrubbing
-        // -------------------------------------------------------------
-        $display("\n--- [TEST 4] Shared Memory Migration (Bank 0 -> Region B) ---");
-        // Reassign Bank 0 to Region B with role Input-Issuer (2'b01)
-        role_reassign[0]          = 1'b1;
-        new_region_id_per_bank[0] = 1'b1;
-        new_role_per_bank[0 +: 2] = 2'b01;
-        step_clk();
-        role_reassign[0]          = 1'b0;
-
-        for (int i = 0; i < 3; i++) begin
-            $display("Bank 0 Scrub Cycle %0d: scrub_active = %b", i+1, scrub_active_bus[0]);
-            step_clk();
-        end
-        step_clk(); // 4th cycle completes scrub
-
-        $display("Bank 0 Scrub Completed: bank_role_clear = %b", bank_role_clear_bus[0]);
-        if (bank_role_clear_bus[0] !== 1'b1) begin
-            $display("ERROR: Expected bank_role_clear pulse!");
-            error_count++;
-        end else begin
-            $display("PASS: Memory bank migration and scrubbing safety verified.");
-        end
-
-        // -------------------------------------------------------------
-        // Summary
-        // -------------------------------------------------------------
         $display("\n================================================================");
         if (error_count == 0) begin
-            $display(" [SUCCESS] ALL HETEROGENEOUS FISSION TESTS PASSED (Errors: 0)");
+            $display(" [SUCCESS] ALL EXECUTED HETEROGENEOUS FISSION TESTS PASSED (Errors: 0)");
             $display("================================================================");
             $finish(0);
         end else begin
