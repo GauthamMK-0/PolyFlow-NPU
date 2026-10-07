@@ -40,7 +40,8 @@ XRUN_FLAGS ?= -64bit \
 # ==============================================================================
 # Targets
 # ==============================================================================
-.PHONY: all run gui clean help lint lint-verilator lint-cadence synth
+.PHONY: all run gui clean help lint lint-verilator lint-cadence synth \
+        sim-iverilog iverilog sim-verilator verilator
 
 # Default target: Headless simulation
 all: run
@@ -59,6 +60,28 @@ run:
 # Shortcut target to run with GUI enabled
 gui:
 	@$(MAKE) run GUI=1
+
+# --- Open-Source Simulation Targets ---
+sim-iverilog:
+	@echo "=================================================================="
+	@echo "Running Icarus Verilog Simulation for $(TB_MODULE) [Test: $(TEST)]"
+	@echo "=================================================================="
+	@mkdir -p $(OUT_DIR)
+	iverilog -g2012 -I $(TB_DIR) -I $(TB_DIR)/tests -o $(OUT_DIR)/$(TB_MODULE).vvp $(SRC_FILES)
+	vvp $(OUT_DIR)/$(TB_MODULE).vvp +TEST=$(TEST)
+
+iverilog: sim-iverilog
+
+sim-verilator:
+	@echo "=================================================================="
+	@echo "Running Verilator Simulation for $(TB_MODULE) [Test: $(TEST)]"
+	@echo "=================================================================="
+	verilator -j $(shell nproc) --binary --timing -Wall -I$(TB_DIR) -I$(TB_DIR)/tests \
+		-MAKEFLAGS "-j$(shell nproc) OPT_FAST=-O1" $(SRC_FILES) \
+		--top-module $(TB_MODULE) -o V$(TB_MODULE) > /dev/null
+	./obj_dir/V$(TB_MODULE) +TEST=$(TEST)
+
+verilator: sim-verilator
 
 # --- Linting Targets ---
 lint: lint-verilator
@@ -85,14 +108,15 @@ synth:
 # --- Cleanup Target ---
 clean:
 	@echo "Cleaning up $(TOP_MODULE) simulation sandbox, logs, and reports..."
-	rm -rf $(OUT_DIR) xcelium.d waves.shm .simvision xrun.history xrun.log genus* fv/ *.rpt *_netlist.* reports/ netlist/
+	rm -rf $(OUT_DIR) obj_dir *.vvp xcelium.d waves.shm .simvision xrun.history xrun.log genus* fv/ *.rpt *_netlist.* reports/ netlist/
 
 # --- Help Target ---
 help:
 	@echo "Available Makefile targets for $(TOP_MODULE):"
-	@echo "  make run            - Run simulation in headless batch mode (default, GUI=0)"
+	@echo "  make run            - Run simulation using Cadence Xcelium (default, GUI=0)"
 	@echo "  make gui            - Run simulation with SimVision GUI enabled (GUI=1)"
-	@echo "  make run GUI=1      - Run simulation with SimVision GUI enabled"
+	@echo "  make iverilog       - Fast compilation & simulation using Icarus Verilog (< 1s)"
+	@echo "  make verilator      - Cycle-accurate simulation using Verilator"
 	@echo "  make run TEST=<name>- Run specific test (e.g. TEST=ws, TEST=coexec)"
 	@echo "  make lint           - Run strict Verilator linting"
 	@echo "  make lint-cadence   - Run Cadence HAL linting"

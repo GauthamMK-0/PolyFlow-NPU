@@ -28,6 +28,7 @@ module dfs_top_tb;
 
     int error_count = 0;
     string target_test = "ALL";
+    bit test_matched = 0;
 
     // Helper to read accumulator for PE at [row, col]
     function automatic logic signed [ACC_W-1:0] get_pe_acc(int r, int c);
@@ -101,6 +102,7 @@ module dfs_top_tb;
 
     // --- Test Dispatcher & Regression Summary ---
     initial begin
+        test_matched = 0;
         void'($value$plusargs("TEST=%s", target_test));
 
         $display("================================================================");
@@ -109,28 +111,41 @@ module dfs_top_tb;
         $display("================================================================");
 
         if (target_test == "ALL" || target_test == "ws") begin
+            test_matched = 1;
             reset_dut();
             run_test_ws_mode();
         end
 
         if (target_test == "ALL" || target_test == "os") begin
+            test_matched = 1;
             reset_dut();
             run_test_os_mode();
         end
 
         if (target_test == "ALL" || target_test == "is") begin
+            test_matched = 1;
             reset_dut();
             run_test_is_mode();
         end
 
         if (target_test == "ALL" || target_test == "gating") begin
+            test_matched = 1;
             reset_dut();
             run_test_corner_compute_gating();
         end
 
         if (target_test == "ALL" || target_test == "random") begin
+            test_matched = 1;
             reset_dut();
             run_test_random_stimulus();
+        end
+
+        if (!test_matched) begin
+            $display("\n================================================================");
+            $display(" [ERROR] Unknown test selection '%s'!", target_test);
+            $display(" Valid options: ws, os, is, gating, random, ALL");
+            $display("================================================================");
+            $finish(1);
         end
 
         // Display comprehensive functional coverage report

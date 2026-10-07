@@ -14,6 +14,8 @@ TEST          ?= ALL
 
 .PHONY: help all lint lint-verilator lint-cadence \
         run-model1 run-model2 run-model3 run-all \
+        iverilog-model1 iverilog-model2 iverilog-model3 \
+        verilator-model1 verilator-model2 verilator-model3 \
         synth-model1 synth-model2 synth-model3 synth-all \
         sim-verilator sim-iverilog sim-xrun clean
 
@@ -30,6 +32,16 @@ help:
 	@echo "   make run-model2 [GUI=0/1] [TEST=...]  - Run Model 2: Spatial Fission"
 	@echo "   make run-model3 [GUI=0/1] [TEST=...]  - Run Model 3: Heterogeneous Fission"
 	@echo "   make run-all    [GUI=0/1] [TEST=...]  - Run all 3 models sequentially"
+	@echo ""
+	@echo " Fast Icarus Verilog Simulation Shortcuts (< 1s):"
+	@echo "   make iverilog-model1 [TEST=...]       - Run Model 1 with Icarus"
+	@echo "   make iverilog-model2 [TEST=...]       - Run Model 2 with Icarus"
+	@echo "   make iverilog-model3 [TEST=...]       - Run Model 3 with Icarus"
+	@echo ""
+	@echo " Verilator Cycle Simulation Shortcuts:"
+	@echo "   make verilator-model1 [TEST=...]      - Run Model 1 with Verilator"
+	@echo "   make verilator-model2 [TEST=...]      - Run Model 2 with Verilator"
+	@echo "   make verilator-model3 [TEST=...]      - Run Model 3 with Verilator"
 	@echo ""
 	@echo " Cadence Genus Logic Synthesis Targets:"
 	@echo "   make synth-model1                     - Synthesize Model 1 netlist & reports"
@@ -62,6 +74,26 @@ run-model3:
 	@$(MAKE) -C models/$(MODEL_VARIANT)/heterogeneous_fission run GUI=$(GUI) TEST=$(TEST)
 
 run-all: run-model1 run-model2 run-model3
+
+# --- Fast Icarus Verilog Simulation Shortcuts ---
+iverilog-model1:
+	@$(MAKE) -C models/$(MODEL_VARIANT)/dataflow_switching iverilog TEST=$(TEST)
+
+iverilog-model2:
+	@$(MAKE) -C models/$(MODEL_VARIANT)/spatial_fission iverilog TEST=$(TEST)
+
+iverilog-model3:
+	@$(MAKE) -C models/$(MODEL_VARIANT)/heterogeneous_fission iverilog TEST=$(TEST)
+
+# --- Verilator Cycle Simulation Shortcuts ---
+verilator-model1:
+	@$(MAKE) -C models/$(MODEL_VARIANT)/dataflow_switching verilator TEST=$(TEST)
+
+verilator-model2:
+	@$(MAKE) -C models/$(MODEL_VARIANT)/spatial_fission verilator TEST=$(TEST)
+
+verilator-model3:
+	@$(MAKE) -C models/$(MODEL_VARIANT)/heterogeneous_fission verilator TEST=$(TEST)
 
 # --- Optional GUI Shortcuts (SimVision) ---
 gui-model1:

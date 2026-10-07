@@ -60,6 +60,7 @@ module hdf_top_tb;
 
     int error_count = 0;
     string target_test = "ALL";
+    bit test_matched = 0;
 
     // Helper to read accumulator for PE at [row, col]
     function automatic logic signed [ACC_W-1:0] get_pe_acc(int r, int c);
@@ -177,6 +178,7 @@ module hdf_top_tb;
 
     // --- Test Dispatcher & Regression Summary ---
     initial begin
+        test_matched = 0;
         void'($value$plusargs("TEST=%s", target_test));
 
         $display("================================================================");
@@ -185,43 +187,59 @@ module hdf_top_tb;
         $display("================================================================");
 
         if (target_test == "ALL" || target_test == "split") begin
+            test_matched = 1;
             reset_dut();
             run_test_split_partition();
         end
 
         if (target_test == "ALL" || target_test == "coexec") begin
+            test_matched = 1;
             reset_dut();
             run_test_hetero_coexec();
         end
 
         if (target_test == "ALL" || target_test == "eppa") begin
+            test_matched = 1;
             reset_dut();
             run_test_eppa_phase_arb();
         end
 
         if (target_test == "ALL" || target_test == "scrub") begin
+            test_matched = 1;
             reset_dut();
             run_test_mem_scrub_migration();
         end
 
         if (target_test == "ALL" || target_test == "lifetime") begin
+            test_matched = 1;
             reset_dut();
             run_test_corner_lifetime_expiry();
         end
 
         if (target_test == "ALL" || target_test == "contention") begin
+            test_matched = 1;
             reset_dut();
             run_test_corner_bank_contention();
         end
 
         if (target_test == "ALL" || target_test == "reconfig") begin
+            test_matched = 1;
             reset_dut();
             run_test_corner_reconfig_split();
         end
 
         if (target_test == "ALL" || target_test == "random") begin
+            test_matched = 1;
             reset_dut();
             run_test_random_stimulus();
+        end
+
+        if (!test_matched) begin
+            $display("\n================================================================");
+            $display(" [ERROR] Unknown test selection '%s'!", target_test);
+            $display(" Valid options: split, coexec, eppa, scrub, lifetime, contention, reconfig, random, ALL");
+            $display("================================================================");
+            $finish(1);
         end
 
         // Display comprehensive functional coverage report
