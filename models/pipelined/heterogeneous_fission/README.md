@@ -37,12 +37,24 @@ models/heterogeneous_fission/
 
 ## Verification & Simulation
 
+### Test Suite & Verification Matrix
+The test harness (`tb/hdf_top_tb.sv`) implements a modular hybrid verification architecture:
+- `test_split_partition.svh`: Dynamic dispatch-time column partitioning (Cols 0-1: Reg A, Cols 2-3: Reg B).
+- `test_hetero_coexec.svh`: Heterogeneous co-execution across WS+OS, IS+WS, and OS+IS dataflow pairs.
+- `test_eppa_phase_arb.svh`: EPPA memory bandwidth allocation across BURST, STREAM, IDLE, and RECONFIG phases with urgency flags.
+- `test_mem_scrub_migration.svh`: Memory bank migration with mandatory 4-cycle hardware zeroing scrub.
+- `test_corner_lifetime_expiry.svh`: Tenant hardware lifetime expiration countdown and automatic PE compute clamping.
+- `test_corner_bank_contention.svh`: Concurrent multi-tenant memory bank contention with mutual exclusion and starvation avoidance.
+- `test_corner_reconfig_split.svh`: Dynamic online array fission across boundary columns 0, 1, 2, 3, 4.
+- `test_random_stimulus.svh`: Constrained-random stimulus with automated self-checking against a golden mathematical model.
+- `hdf_coverage_monitor.svh`: Dual-compatible functional coverage engine with IEEE 1800 covergroups for Cadence IMC and active bin tracker (**30 / 30 bins = 100.0% coverage**).
+
 ### Using Cadence Xcelium (xrun)
 ```bash
 cd models/pipelined/heterogeneous_fission
 make run              # Headless batch mode (default)
 make gui              # Interactive GUI mode with SimVision
-make run TEST=coexec  # Run specific testcase
+make run TEST=coexec  # Run specific testcase (e.g. lifetime, contention, reconfig, random)
 make clean            # Clean output/ sandbox and log files
 ```
 

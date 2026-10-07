@@ -120,9 +120,13 @@ module sfa_top_tb;
     initial clk = 0;
     always #5 clk <= ~clk;
 
+    // --- Functional Coverage & Monitoring ---
+    `include "sfa_coverage_monitor.svh"
+
     task automatic step_clk();
         @(posedge clk);
         #1;
+        sample_coverage();
     endtask
 
     task automatic reset_dut();
@@ -155,6 +159,10 @@ module sfa_top_tb;
     `include "tests/test_concurrent_ws.svh"
     `include "tests/test_eppa_phase_arb.svh"
     `include "tests/test_mem_scrub.svh"
+    `include "tests/test_corner_bank_contention.svh"
+    `include "tests/test_corner_reconfig_split.svh"
+    `include "tests/test_corner_compute_gating.svh"
+    `include "tests/test_random_stimulus.svh"
 
     // --- Test Dispatcher & Regression Summary ---
     initial begin
@@ -184,6 +192,29 @@ module sfa_top_tb;
             reset_dut();
             run_test_mem_scrub();
         end
+
+        if (target_test == "ALL" || target_test == "contention") begin
+            reset_dut();
+            run_test_corner_bank_contention();
+        end
+
+        if (target_test == "ALL" || target_test == "reconfig") begin
+            reset_dut();
+            run_test_corner_reconfig_split();
+        end
+
+        if (target_test == "ALL" || target_test == "gating") begin
+            reset_dut();
+            run_test_corner_compute_gating();
+        end
+
+        if (target_test == "ALL" || target_test == "random") begin
+            reset_dut();
+            run_test_random_stimulus();
+        end
+
+        // Display comprehensive functional coverage report
+        print_functional_coverage_report();
 
         $display("\n================================================================");
         if (error_count == 0) begin

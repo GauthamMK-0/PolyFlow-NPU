@@ -68,9 +68,13 @@ module dfs_top_tb;
     initial clk = 0;
     always #5 clk <= ~clk;
 
+    // --- Functional Coverage & Monitoring ---
+    `include "dfs_coverage_monitor.svh"
+
     task automatic step_clk();
         @(posedge clk);
         #1;
+        sample_coverage();
     endtask
 
     task automatic reset_dut();
@@ -92,6 +96,8 @@ module dfs_top_tb;
     `include "tests/test_ws_mode.svh"
     `include "tests/test_os_mode.svh"
     `include "tests/test_is_mode.svh"
+    `include "tests/test_corner_compute_gating.svh"
+    `include "tests/test_random_stimulus.svh"
 
     // --- Test Dispatcher & Regression Summary ---
     initial begin
@@ -116,6 +122,19 @@ module dfs_top_tb;
             reset_dut();
             run_test_is_mode();
         end
+
+        if (target_test == "ALL" || target_test == "gating") begin
+            reset_dut();
+            run_test_corner_compute_gating();
+        end
+
+        if (target_test == "ALL" || target_test == "random") begin
+            reset_dut();
+            run_test_random_stimulus();
+        end
+
+        // Display comprehensive functional coverage report
+        print_functional_coverage_report();
 
         $display("\n================================================================");
         if (error_count == 0) begin

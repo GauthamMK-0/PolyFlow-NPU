@@ -34,12 +34,24 @@ models/spatial_fission/
 
 ## Verification & Simulation
 
+### Test Suite & Verification Matrix
+The test harness (`tb/sfa_top_tb.sv`) implements a modular hybrid verification architecture:
+- `test_split_partition.svh`: Dynamic dispatch-time column partitioning (Cols 0-1: Reg A, Cols 2-3: Reg B).
+- `test_concurrent_ws.svh`: Multi-tenant concurrent execution with boundary electrical isolation (combinational).
+- `test_eppa_phase_arb.svh`: EPPA memory bandwidth allocation across BURST, STREAM, IDLE, and RECONFIG phases with urgency flags.
+- `test_mem_scrub.svh`: Memory bank migration with mandatory 4-cycle hardware zeroing scrub.
+- `test_corner_bank_contention.svh`: Concurrent multi-tenant memory bank contention with mutual exclusion and starvation avoidance.
+- `test_corner_reconfig_split.svh`: Dynamic online array fission across boundary columns 0, 1, 2, 3, 4.
+- `test_corner_compute_gating.svh`: Per-region compute enable gating and product zero-clamping.
+- `test_random_stimulus.svh`: Constrained-random stimulus with automated self-checking against a golden mathematical model.
+- `sfa_coverage_monitor.svh`: Dual-compatible functional coverage engine with IEEE 1800 covergroups for Cadence IMC and active bin tracker (**19 / 19 bins = 100.0% coverage**).
+
 ### Using Cadence Xcelium (xrun)
 ```bash
 cd models/non_pipelined/spatial_fission
 make run              # Headless batch mode (default)
 make gui              # Interactive GUI mode with SimVision
-make run TEST=split   # Run specific testcase
+make run TEST=concurrent # Run specific testcase (e.g. contention, reconfig, gating, random)
 make clean            # Clean output/ sandbox and log files
 ```
 
