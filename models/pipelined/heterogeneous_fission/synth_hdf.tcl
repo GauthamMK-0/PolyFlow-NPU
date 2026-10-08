@@ -32,10 +32,19 @@ init_design
 if {[file exists hdf_top.sdc]} {
     read_sdc hdf_top.sdc
 } else {
-    # Default fallback: 1000 MHz / 1.0 ns clock on clk
-    create_clock -name clk -period 1.0 [get_ports clk]
-    set_input_delay  0.2 -clock clk [all_inputs -no_clocks]
-    set_output_delay 0.2 -clock clk [all_outputs]
+    # Default fallback: 300 MHz / 3.333 ns clock on clk
+    create_clock -name clk -period 3.333 [get_ports clk]
+    set_input_delay  0.500 -clock clk [all_inputs -no_clocks]
+    set_output_delay 0.500 -clock clk [all_outputs]
+    set_false_path -from [get_ports rst_n]
+    set_false_path -from [get_ports cfg_split_col*]
+    set_false_path -from [get_ports cfg_update_strobe]
+    set_false_path -from [get_ports dataflow_mode*]
+    set_false_path -from [get_ports phase_tag*]
+    set_false_path -from [get_ports role_reassign*]
+    set_false_path -from [get_ports new_region_id_per_bank*]
+    set_false_path -from [get_ports new_role_per_bank*]
+    set_false_path -from [get_ports lifetime_init*]
 }
 
 # --- Synthesis Effort Controls ---
@@ -48,12 +57,14 @@ syn_generic
 syn_map
 syn_opt
 
-# --- Timing, Power, and Area Reports ---
+# --- Timing, Power, Area, and Summary Reports ---
 file mkdir reports
-report_timing > reports/timing_hdf.rpt
-report_power  > reports/power_hdf.rpt
-report_area   > reports/area_hdf.rpt
-report_qor    > reports/qor_hdf.rpt
+report_timing  > reports/timing_hdf.rpt
+report_power   > reports/power_hdf.rpt
+report_area    > reports/area_hdf.rpt
+report_qor     > reports/qor_hdf.rpt
+report_gates   > reports/gates_hdf.rpt
+catch { report_summary > reports/summary_hdf.rpt }
 
 # --- Netlist & Gate-Level Files Generation ---
 file mkdir netlist
@@ -61,6 +72,11 @@ write_hdl > netlist/hdf_top_netlist.v
 write_sdc > netlist/hdf_top_netlist.sdc
 write_sdf -timescale ns -nonegchecks -recrem split -edges check_edge -setuphold split > netlist/hdf_top_netlist.sdf
 
+puts "=================================================================="
+puts " [SYNTHESIS EXECUTIVE SUMMARY: hdf_top @ 300 MHz]"
+puts "=================================================================="
+report_qor
+report_area
 puts "=================================================================="
 puts " Genus Synthesis Finished Successfully! Check reports/ and netlist/ for details."
 puts "=================================================================="

@@ -24,10 +24,12 @@ init_design
 if {[file exists dfs_top.sdc]} {
     read_sdc dfs_top.sdc
 } else {
-    # Default fallback: 1000 MHz / 1.0 ns clock on clk
-    create_clock -name clk -period 1.0 [get_ports clk]
-    set_input_delay  0.2 -clock clk [all_inputs -no_clocks]
-    set_output_delay 0.2 -clock clk [all_outputs]
+    # Default fallback: 300 MHz / 3.333 ns clock on clk
+    create_clock -name clk -period 3.333 [get_ports clk]
+    set_input_delay  0.500 -clock clk [all_inputs -no_clocks]
+    set_output_delay 0.500 -clock clk [all_outputs]
+    set_false_path -from [get_ports rst_n]
+    set_false_path -from [get_ports cfg_dataflow_mode*]
 }
 
 # --- Synthesis Effort Controls ---
@@ -40,12 +42,14 @@ syn_generic
 syn_map
 syn_opt
 
-# --- Timing, Power, and Area Reports ---
+# --- Timing, Power, Area, and Summary Reports ---
 file mkdir reports
-report_timing > reports/timing_dfs.rpt
-report_power  > reports/power_dfs.rpt
-report_area   > reports/area_dfs.rpt
-report_qor    > reports/qor_dfs.rpt
+report_timing  > reports/timing_dfs.rpt
+report_power   > reports/power_dfs.rpt
+report_area    > reports/area_dfs.rpt
+report_qor     > reports/qor_dfs.rpt
+report_gates   > reports/gates_dfs.rpt
+catch { report_summary > reports/summary_dfs.rpt }
 
 # --- Netlist & Gate-Level Files Generation ---
 file mkdir netlist
@@ -53,6 +57,11 @@ write_hdl > netlist/dfs_top_netlist.v
 write_sdc > netlist/dfs_top_netlist.sdc
 write_sdf -timescale ns -nonegchecks -recrem split -edges check_edge -setuphold split > netlist/dfs_top_netlist.sdf
 
+puts "=================================================================="
+puts " [SYNTHESIS EXECUTIVE SUMMARY: dfs_top @ 300 MHz]"
+puts "=================================================================="
+report_qor
+report_area
 puts "=================================================================="
 puts " Genus Synthesis Finished Successfully! Check reports/ and netlist/ for details."
 puts "=================================================================="
