@@ -32,5 +32,5 @@ set_false_path -from [get_ports new_role_per_bank*]
 
 # --- Multicycle Path Constraints ---
 # Partition reconfiguration takes effect across cycles at dispatch time
-set_multicycle_path 2 -setup -from [get_pins -hier *region_id_mask_reg*/CK]
-set_multicycle_path 1 -hold  -from [get_pins -hier *region_id_mask_reg*/CK]
+set_multicycle_path 2 -setup -from [get_cells -hier *region_id_mask*]
+set_multicycle_path 1 -hold  -from [get_cells -hier *region_id_mask*]

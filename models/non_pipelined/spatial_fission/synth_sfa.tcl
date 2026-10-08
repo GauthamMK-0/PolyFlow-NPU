@@ -35,6 +35,9 @@ catch { ungroup -all -flatten }
 # --- Load Timing Constraints ---
 if {[file exists sfa_top.sdc]} {
     read_sdc sfa_top.sdc
+    # Explicitly enforce multicycle path on reconfiguration registers
+    catch { set_multicycle_path 2 -setup -from [get_cells -hier *region_id_mask*] }
+    catch { set_multicycle_path 1 -hold  -from [get_cells -hier *region_id_mask*] }
 } else {
     # Default fallback: 300 MHz / 3.333 ns clock on clk
     create_clock -name clk -period 3.333 [get_ports clk]
@@ -47,8 +50,8 @@ if {[file exists sfa_top.sdc]} {
     set_false_path -from [get_ports role_reassign*]
     set_false_path -from [get_ports new_region_id_per_bank*]
     set_false_path -from [get_ports new_role_per_bank*]
-    set_multicycle_path 2 -setup -from [get_pins -hier *region_id_mask_reg*/CK]
-    set_multicycle_path 1 -hold  -from [get_pins -hier *region_id_mask_reg*/CK]
+    catch { set_multicycle_path 2 -setup -from [get_cells -hier *region_id_mask*] }
+    catch { set_multicycle_path 1 -hold  -from [get_cells -hier *region_id_mask*] }
 }
 
 # --- Synthesis Effort Controls ---
