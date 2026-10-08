@@ -10,9 +10,9 @@ create_clock -name clk -period 3.333 [get_ports clk]
 set_clock_uncertainty 0.050 [get_clocks clk]
 set_clock_transition  0.050 [get_clocks clk]
 
-# Input / Output Delays (15% clock period budget)
-set_input_delay  0.500 -clock clk [all_inputs -no_clocks]
-set_output_delay 0.500 -clock clk [all_outputs]
+# Input / Output Delays (10% clock period budget)
+set_input_delay  0.350 -clock clk [all_inputs -no_clocks]
+set_output_delay 0.350 -clock clk [all_outputs]
 
 # Driving cell & load
 set_driving_cell -lib_cell INVX1 [all_inputs -no_clocks]
@@ -31,3 +31,8 @@ set_false_path -from [get_ports role_reassign*]
 set_false_path -from [get_ports new_region_id_per_bank*]
 set_false_path -from [get_ports new_role_per_bank*]
 set_false_path -from [get_ports lifetime_init*]
+
+# --- Multicycle Path Constraints ---
+# Partition reconfiguration takes effect across cycles at dispatch time
+set_multicycle_path 2 -setup -from [get_pins -hier *region_id_mask_reg*/CK]
+set_multicycle_path 1 -hold  -from [get_pins -hier *region_id_mask_reg*/CK]

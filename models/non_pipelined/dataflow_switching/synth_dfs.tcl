@@ -20,22 +20,28 @@ read_hdl -sv {dfs_pe.sv dfs_array.sv dfs_top.sv}
 elaborate dfs_top
 init_design
 
+# --- Force Array Flattening for Global Datapath Optimization ---
+set_db auto_ungroup both
+catch { ungroup -all -flatten }
+
 # --- Load Timing Constraints ---
 if {[file exists dfs_top.sdc]} {
     read_sdc dfs_top.sdc
 } else {
     # Default fallback: 300 MHz / 3.333 ns clock on clk
     create_clock -name clk -period 3.333 [get_ports clk]
-    set_input_delay  0.500 -clock clk [all_inputs -no_clocks]
-    set_output_delay 0.500 -clock clk [all_outputs]
+    set_input_delay  0.350 -clock clk [all_inputs -no_clocks]
+    set_output_delay 0.350 -clock clk [all_outputs]
     set_false_path -from [get_ports rst_n]
     set_false_path -from [get_ports cfg_dataflow_mode*]
 }
 
 # --- Synthesis Effort Controls ---
-set_db syn_generic_effort medium
-set_db syn_map_effort medium
-set_db syn_opt_effort medium
+set_db syn_generic_effort high
+set_db syn_map_effort high
+set_db syn_opt_effort high
+set_db dp_analytical_opt true
+set_db dp_sharing true
 
 # --- Synthesis Execution ---
 syn_generic

@@ -10,9 +10,9 @@ create_clock -name clk -period 3.333 [get_ports clk]
 set_clock_uncertainty 0.050 [get_clocks clk]
 set_clock_transition  0.050 [get_clocks clk]
 
-# Input / Output Delays (15% clock period budget)
-set_input_delay  0.500 -clock clk [all_inputs -no_clocks]
-set_output_delay 0.500 -clock clk [all_outputs]
+# Input / Output Delays (10% clock period budget)
+set_input_delay  0.350 -clock clk [all_inputs -no_clocks]
+set_output_delay 0.350 -clock clk [all_outputs]
 
 # Driving cell & load
 set_driving_cell -lib_cell INVX1 [all_inputs -no_clocks]
