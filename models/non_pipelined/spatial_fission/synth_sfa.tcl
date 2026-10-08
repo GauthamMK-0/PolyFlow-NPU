@@ -55,7 +55,7 @@ if {[file exists sfa_top.sdc]} {
 set_db syn_generic_effort high
 set_db syn_map_effort high
 set_db syn_opt_effort high
-set_db dp_analytical_opt true
+set_db dp_analytical_opt extreme
 set_db dp_sharing true
 
 # --- Synthesis Execution ---
