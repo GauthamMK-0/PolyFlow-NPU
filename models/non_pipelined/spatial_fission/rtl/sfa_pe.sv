@@ -56,17 +56,13 @@ module sfa_pe #(
     wire compute_active = compute_en && !bank_role_stale;
     wire signed [DATA_W-1:0] mul_a = $signed(stat_weight);
     wire signed [DATA_W-1:0] mul_b = $signed(din_w);
-    wire signed [DATA_W-1:0] mul_a_clamped = compute_active ? mul_a : '0;
-    wire signed [DATA_W-1:0] mul_b_clamped = compute_active ? mul_b : '0;
-
     logic signed [2*DATA_W-1:0] product;
     logic signed [ACC_W-1:0]    product_sext;
 
-    assign product      = mul_a_clamped * mul_b_clamped;
+    assign product      = mul_a * mul_b;
     assign product_sext = {{ (ACC_W - 2*DATA_W){product[2*DATA_W-1]} }, product};
 
-    wire is_zero_operand = (mul_a == '0) || (mul_b == '0);
-    wire do_accumulate   = compute_active && !is_zero_operand;
+    wire do_accumulate   = compute_active;
 
     // Non-Pipelined Combinational MAC (No accumulator registers)
     wire _unused_acc = &{1'b0, acc_clr};

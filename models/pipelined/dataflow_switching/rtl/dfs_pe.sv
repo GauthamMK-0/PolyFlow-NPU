@@ -47,20 +47,17 @@ module dfs_pe #(
         end
     end
 
-    // Operand selection and isolation
+    // Operand selection
     wire signed [DATA_W-1:0] mul_a = (dataflow_mode == DF_OS) ? $signed(din_n) : $signed(stat_operand_reg);
     wire signed [DATA_W-1:0] mul_b = $signed(din_w);
-    wire signed [DATA_W-1:0] mul_a_clamped = compute_en ? mul_a : '0;
-    wire signed [DATA_W-1:0] mul_b_clamped = compute_en ? mul_b : '0;
 
     logic signed [2*DATA_W-1:0] product;
     logic signed [ACC_W-1:0]    product_sext;
 
-    assign product      = mul_a_clamped * mul_b_clamped;
+    assign product      = mul_a * mul_b;
     assign product_sext = {{ (ACC_W - 2*DATA_W){product[2*DATA_W-1]} }, product};
 
-    wire is_zero_operand = (mul_a == '0) || (mul_b == '0);
-    wire do_accumulate   = compute_en && !is_zero_operand;
+    wire do_accumulate   = compute_en;
 
     // MAC Accumulation register
     always_ff @(posedge clk or negedge rst_n) begin

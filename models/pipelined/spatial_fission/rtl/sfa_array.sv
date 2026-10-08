@@ -52,14 +52,20 @@ module sfa_array #(
         end
     end
 
+    // Pre-decode boundary column isolation flags (reduces fanout and gate levels)
+    wire [NUM_COLS-1:1] is_boundary_col;
+    for (genvar c = 1; c < NUM_COLS; c++) begin : gen_bnd_col
+        assign is_boundary_col[c] = (region_id_mask[c] != region_id_mask[c-1]);
+    end
+
     // West inputs with Boundary Isolation:
     // Col 0 always receives external din_w
-    // Col c receives mesh_e from col c-1 UNLESS crossed region boundary (region_id_mask[c] != region_id_mask[c-1])
+    // Col c receives mesh_e from col c-1 UNLESS crossed region boundary (is_boundary_col[c])
     // If boundary is crossed, col c receives din_w_region_b for Region B!
     for (genvar r = 0; r < NUM_ROWS; r++) begin : gen_west_in
         assign mesh_w[r][0] = din_w[r*DATA_W +: DATA_W];
         for (genvar c = 1; c < NUM_COLS; c++) begin : gen_west_inner
-            assign mesh_w[r][c] = (region_id_mask[c] != region_id_mask[c-1]) ?
+            assign mesh_w[r][c] = is_boundary_col[c] ?
                                   din_w_region_b[r*DATA_W +: DATA_W] : mesh_e[r][c-1];
         end
     end
