@@ -28,10 +28,10 @@ catch { ungroup -all -flatten }
 if {[file exists dfs_top.sdc]} {
     read_sdc dfs_top.sdc
 } else {
-    # Default fallback: 300 MHz / 3.333 ns clock on clk
-    create_clock -name clk -period 3.333 [get_ports clk]
-    set_input_delay  0.350 -clock clk [all_inputs -no_clocks]
-    set_output_delay 0.350 -clock clk [all_outputs]
+    # Default fallback: 250 MHz / 4.000 ns clock on clk
+    create_clock -name clk -period 4.000 [get_ports clk]
+    set_input_delay  0.400 -clock clk [all_inputs -no_clocks]
+    set_output_delay 0.400 -clock clk [all_outputs]
     set_false_path -from [get_ports rst_n]
     set_false_path -from [get_ports cfg_dataflow_mode*]
 }
@@ -64,7 +64,7 @@ write_sdc > netlist/dfs_top_netlist.sdc
 write_sdf -timescale ns -nonegchecks -recrem split -edges check_edge -setuphold split > netlist/dfs_top_netlist.sdf
 
 puts "=================================================================="
-puts " [SYNTHESIS EXECUTIVE SUMMARY: dfs_top @ 300 MHz]"
+puts " [SYNTHESIS EXECUTIVE SUMMARY: dfs_top @ 250 MHz]"
 puts "=================================================================="
 report_qor
 report_area

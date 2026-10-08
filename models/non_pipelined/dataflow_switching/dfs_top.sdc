@@ -1,18 +1,18 @@
 # ==============================================================================
 # SDC Timing Constraints: dfs_top (Model 1: Dataflow Switching - Non-Pipelined)
-# Target Operating Frequency: 300 MHz (Clock Period = 3.333 ns)
+# Target Operating Frequency: 250 MHz (Clock Period = 4.000 ns)
 # ==============================================================================
 
-# Clock definition (3.333 ns = 300 MHz target frequency)
-create_clock -name clk -period 3.333 [get_ports clk]
+# Clock definition (4.000 ns = 250 MHz target frequency)
+create_clock -name clk -period 4.000 [get_ports clk]
 
 # Clock uncertainty & transition
 set_clock_uncertainty 0.050 [get_clocks clk]
 set_clock_transition  0.050 [get_clocks clk]
 
 # Input / Output Delays (10% clock period budget)
-set_input_delay  0.350 -clock clk [all_inputs -no_clocks]
-set_output_delay 0.350 -clock clk [all_outputs]
+set_input_delay  0.400 -clock clk [all_inputs -no_clocks]
+set_output_delay 0.400 -clock clk [all_outputs]
 
 # Driving cell & load
 set_driving_cell -lib_cell INVX1 [all_inputs -no_clocks]
