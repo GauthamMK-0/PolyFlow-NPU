@@ -41,7 +41,7 @@ set_db syn_generic_effort high
 set_db syn_map_effort high
 set_db syn_opt_effort high
 set_db dp_analytical_opt extreme
-set_db dp_sharing true
+set_db dp_sharing advanced
 
 # --- Synthesis Execution ---
 syn_generic
