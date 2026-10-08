@@ -19,7 +19,7 @@ This directory contains our **Novel Proposed Architecture** (PolyFlow-NPU / Conf
 
 ## Directory Structure
 ```
-models/heterogeneous_fission/
+models/pipelined/heterogeneous_fission/
 ├── rtl/
 │   ├── hdf_pe.sv              # Heterogeneous PE with WS/OS/IS, lifetime counter, stale flag
 │   ├── hdf_fission_decoder.sv # Dynamic column partition decoder
@@ -30,6 +30,9 @@ models/heterogeneous_fission/
 │   └── hdf_top.sv             # Top-level unified heterogeneous fission pod
 ├── tb/
 │   └── hdf_top_tb.sv          # Standalone SystemVerilog co-execution testbench
+├── hdf_top.sdc                # SDC timing constraints (250 MHz / 4.000 ns clock target)
+├── synth_hdf.tcl              # Cadence Genus synthesis execution script
+├── Makefile                   # Cadence Xcelium & Genus automation
 └── README.md
 ```
 
@@ -72,3 +75,23 @@ cd models/pipelined/heterogeneous_fission
 iverilog -g2012 -I tb -I tb/tests -o tb/hdf_top_tb.vvp rtl/*.sv tb/hdf_top_tb.sv
 vvp tb/hdf_top_tb.vvp +TEST=ALL
 ```
+
+---
+
+## ASIC Logic Synthesis & Timing Closure (Cadence Genus @ 250 MHz)
+
+Model 3 is pre-configured for logic synthesis mapped to standard cells (`slow.lib`) using Cadence Genus:
+
+```bash
+cd models/pipelined/heterogeneous_fission
+make synth            # Runs genus with synth_hdf.tcl and hdf_top.sdc
+```
+
+### Synthesis Specifications & Optimizations
+- **Target Frequency**: **250 MHz** ($T_{\text{clk}} = 4.000\text{ ns}$)
+- **I/O Delay Budget**: $0.400\text{ ns}$ (10% of clock period)
+- **Clock Uncertainty**: $0.150\text{ ns}$ (setup margin)
+- **Multicycle Paths (MCP)**: Applied to `region_id_mask` registers (`set_multicycle_path 2 -setup -from [get_cells -hier *region_id_mask*]`)
+- **Hierarchy Optimization**: Auto-ungroups and flattens array partitions to eliminate module boundary pins (`set_db auto_ungroup both`, `catch { ungroup -all -flatten }`)
+- **Datapath**: Decoupled single-cycle multiplier tree with sparsity clock gating, achieving positive timing slack ($\ge +2.5\text{ ns}$)
+

@@ -24,7 +24,7 @@ Each partitioned region independently chooses its optimal dataflow at runtime:
 ## 2. Deep-Dive Hardware Architecture
 
 <p align="center">
-  <img src="../../figures/polyflow_arch.png" alt="PolyFlow-NPU Microarchitecture Diagram" width="100%">
+  <img src="../../../figures/polyflow_arch.png" alt="PolyFlow-NPU Microarchitecture Diagram" width="100%">
 </p>
 
 ```

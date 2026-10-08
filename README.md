@@ -162,3 +162,21 @@ If you wish to simulate all models sequentially from the repository root:
 # Event-driven simulation with Icarus Verilog:
 ./scripts/run_all_models.sh iverilog all
 ```
+
+---
+
+### 5.4 ASIC Logic Synthesis & Timing Closure Specifications
+
+All 6 models are fully constrained for physical implementation in the **Cadence Genus Synthesis Solution** (`genus`):
+
+| Parameter | Specification | Details |
+| :--- | :--- | :--- |
+| **Target Clock Frequency** | **250 MHz** | Clock period $T_{\text{clk}} = 4.000\text{ ns}$ |
+| **Clock Uncertainty** | `0.150 ns` | Margin for setup clock jitter and CTS skew |
+| **Clock Slew Rate** | `0.050 ns` | 20%–80% transition time on clock tree |
+| **Input / Output Budget** | `0.400 ns` (10%) | Realistic I/O pad and off-chip capacitive load delay |
+| **Target Technology** | `slow.lib` | Worst-case PVT corner standard cell library |
+| **Multicycle Paths (MCP)** | 2 Setup / 1 Hold | Applied to static `region_id_mask` registers (`[get_cells -hier *region_id_mask*]`) |
+| **Hierarchy Optimization** | Auto-ungroup / Flatten | Dissolves PE array boundary pins (`set_db auto_ungroup both`, `catch { ungroup -all -flatten }`) |
+| **Datapath Architecture** | Decoupled Single-Cycle MAC | Dedicated multiplier tree without series gating, enabling positive slack ($\ge +2.5\text{ ns}$) |
+

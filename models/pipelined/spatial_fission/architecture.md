@@ -16,7 +16,7 @@ Model 2 introduces **Spatial Fission** (following the architecture of prior rese
 - **The Constraint:** Both Region A and Region B are **rigidly locked to Weight-Stationary (WS)** dataflow. There is no per-region dataflow switching.
 
 <p align="center">
-  <img src="../../figures/figA_homo_fission.png" alt="Homogeneous Spatial Fission Architecture Diagram" width="100%">
+  <img src="../../../figures/figA_homo_fission.png" alt="Homogeneous Spatial Fission Architecture Diagram" width="100%">
 </p>
 
 ---

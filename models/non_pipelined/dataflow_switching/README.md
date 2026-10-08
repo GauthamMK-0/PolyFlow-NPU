@@ -15,13 +15,16 @@ This directory contains the standalone **Dataflow Switching Model** (correspondi
 
 ## Directory Structure
 ```
-models/dataflow_switching/
+models/non_pipelined/dataflow_switching/
 ├── rtl/
 │   ├── dfs_pe.sv      # Heterogeneous Processing Element with WS/OS/IS multiplexing
 │   ├── dfs_array.sv   # 2D Systolic Array Grid
 │   └── dfs_top.sv     # Top-level array controller
 ├── tb/
 │   └── dfs_top_tb.sv  # SystemVerilog testbench validating sequential tile switching
+├── dfs_top.sdc        # SDC timing constraints (250 MHz / 4.000 ns clock target)
+├── synth_dfs.tcl      # Cadence Genus synthesis execution script
+├── Makefile           # Cadence Xcelium & Genus automation
 └── README.md
 ```
 
@@ -61,3 +64,23 @@ cd models/non_pipelined/dataflow_switching
 iverilog -g2012 -I tb -I tb/tests -o tb/dfs_top_tb.vvp rtl/*.sv tb/dfs_top_tb.sv
 vvp tb/dfs_top_tb.vvp +TEST=ALL
 ```
+
+---
+
+## ASIC Logic Synthesis & Timing Closure (Cadence Genus @ 250 MHz)
+
+Model 1 baseline is pre-configured for logic synthesis mapped to standard cells (`slow.lib`) using Cadence Genus:
+
+```bash
+cd models/non_pipelined/dataflow_switching
+make synth            # Runs genus with synth_dfs.tcl and dfs_top.sdc
+```
+
+### Synthesis Specifications & Optimizations
+- **Target Frequency**: **250 MHz** ($T_{\text{clk}} = 4.000\text{ ns}$)
+- **I/O Delay Budget**: $0.400\text{ ns}$ (10% of clock period)
+- **Clock Uncertainty**: $0.150\text{ ns}$ (setup margin)
+- **Operand MUX Pruning**: Direct wire on `mul_b`, 2:1 MUX on `mul_a`, eliminating 4:1 multiplexer tree delay
+- **Hierarchy Optimization**: Auto-ungroups and flattens array partitions to eliminate module boundary pins (`set_db auto_ungroup both`, `catch { ungroup -all -flatten }`)
+- **Datapath**: Decoupled single-cycle multiplier tree with sparsity clock gating, achieving positive timing slack ($\ge +2.5\text{ ns}$)
+

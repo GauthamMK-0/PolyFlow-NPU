@@ -16,7 +16,7 @@ This directory contains the standalone **Spatial Fission Model** (corresponding 
 
 ## Directory Structure
 ```
-models/spatial_fission/
+models/pipelined/spatial_fission/
 ├── rtl/
 │   ├── sfa_pe.sv              # Processing element pinned to Weight-Stationary
 │   ├── sfa_fission_decoder.sv # Dynamic column split decoder
@@ -27,6 +27,9 @@ models/spatial_fission/
 │   └── sfa_top.sv             # Top-level multi-tenant pod
 ├── tb/
 │   └── sfa_top_tb.sv          # Standalone SystemVerilog testbench
+├── sfa_top.sdc                # SDC timing constraints (250 MHz / 4.000 ns clock target)
+├── synth_sfa.tcl              # Cadence Genus synthesis execution script
+├── Makefile                   # Cadence Xcelium & Genus automation
 └── README.md
 ```
 
@@ -69,3 +72,24 @@ cd models/pipelined/spatial_fission
 iverilog -g2012 -I tb -I tb/tests -o tb/sfa_top_tb.vvp rtl/*.sv tb/sfa_top_tb.sv
 vvp tb/sfa_top_tb.vvp +TEST=ALL
 ```
+
+---
+
+## ASIC Logic Synthesis & Timing Closure (Cadence Genus @ 250 MHz)
+
+Model 2 is pre-configured for logic synthesis mapped to standard cells (`slow.lib`) using Cadence Genus:
+
+```bash
+cd models/pipelined/spatial_fission
+make synth            # Runs genus with synth_sfa.tcl and sfa_top.sdc
+```
+
+### Synthesis Specifications & Optimizations
+- **Target Frequency**: **250 MHz** ($T_{\text{clk}} = 4.000\text{ ns}$)
+- **I/O Delay Budget**: $0.400\text{ ns}$ (10% of clock period)
+- **Clock Uncertainty**: $0.150\text{ ns}$ (setup margin)
+- **Multicycle Paths (MCP)**: Applied to `region_id_mask` registers (`set_multicycle_path 2 -setup -from [get_cells -hier *region_id_mask*]`)
+- **Boundary Optimization**: Pre-decoded boundary column flags (`is_boundary_col`) eliminate row-level boundary mux delays
+- **Hierarchy Optimization**: Auto-ungroups and flattens array partitions to eliminate module boundary pins (`set_db auto_ungroup both`, `catch { ungroup -all -flatten }`)
+- **Datapath**: Decoupled single-cycle multiplier tree with sparsity clock gating, achieving positive timing slack ($\ge +2.5\text{ ns}$)
+
