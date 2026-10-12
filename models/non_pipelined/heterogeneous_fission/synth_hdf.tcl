@@ -35,14 +35,14 @@ catch { ungroup -all -flatten }
 # --- Load Timing Constraints ---
 if {[file exists hdf_top.sdc]} {
     read_sdc hdf_top.sdc
-    # Explicitly enforce multicycle path on reconfiguration registers
-    catch { set_multicycle_path 2 -setup -from [get_cells -hier *region_id_mask*] }
-    catch { set_multicycle_path 1 -hold  -from [get_cells -hier *region_id_mask*] }
+    # Explicitly enforce multicycle path on reconfiguration registers (3-cycle setup, 2-cycle hold)
+    catch { set_multicycle_path 3 -setup -from [get_cells -hier *region_id_mask*] }
+    catch { set_multicycle_path 2 -hold  -from [get_cells -hier *region_id_mask*] }
 } else {
-    # Default fallback: 250 MHz / 4.000 ns clock on clk
-    create_clock -name clk -period 4.000 [get_ports clk]
-    set_input_delay  0.400 -clock clk [all_inputs -no_clocks]
-    set_output_delay 0.400 -clock clk [all_outputs]
+    # Default fallback: 200 MHz / 5.000 ns clock on clk
+    create_clock -name clk -period 5.000 [get_ports clk]
+    set_input_delay  0.500 -clock clk [all_inputs -no_clocks]
+    set_output_delay 0.500 -clock clk [all_outputs]
     set_false_path -from [get_ports rst_n]
     set_false_path -from [get_ports cfg_split_col*]
     set_false_path -from [get_ports cfg_update_strobe]
@@ -52,8 +52,8 @@ if {[file exists hdf_top.sdc]} {
     set_false_path -from [get_ports new_region_id_per_bank*]
     set_false_path -from [get_ports new_role_per_bank*]
     set_false_path -from [get_ports lifetime_init*]
-    catch { set_multicycle_path 2 -setup -from [get_cells -hier *region_id_mask*] }
-    catch { set_multicycle_path 1 -hold  -from [get_cells -hier *region_id_mask*] }
+    catch { set_multicycle_path 3 -setup -from [get_cells -hier *region_id_mask*] }
+    catch { set_multicycle_path 2 -hold  -from [get_cells -hier *region_id_mask*] }
 }
 
 # --- Synthesis Effort Controls ---
@@ -84,7 +84,7 @@ write_sdc > netlist/hdf_top_netlist.sdc
 write_sdf -timescale ns -nonegchecks -recrem split -edges check_edge -setuphold split > netlist/hdf_top_netlist.sdf
 
 puts "=================================================================="
-puts " [SYNTHESIS EXECUTIVE SUMMARY: hdf_top @ 250 MHz]"
+puts " [SYNTHESIS EXECUTIVE SUMMARY: hdf_top @ 200 MHz]"
 puts "=================================================================="
 report_qor
 report_area
