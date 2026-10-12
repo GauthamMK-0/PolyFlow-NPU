@@ -21,6 +21,7 @@ task automatic run_test_is_mode();
     step_clk(); // 24 + 24 = 48
     step_clk(); // 48 + 24 = 72
     tile_compute_en = 0;
+    step_clk(); // Pipeline drain cycle: drains final stage into accumulator
 
     $display("IS Mode: PE[0][0] Accumulator = %0d (Expected: 72)", get_pe_acc(0,0));
     if (get_pe_acc(0,0) !== 32'd72) begin

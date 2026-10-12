@@ -26,6 +26,7 @@ task automatic run_test_os_mode();
     for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd5);
     step_clk();
     tile_compute_en = 0;
+    step_clk(); // Pipeline drain cycle: drains final stage into accumulator
 
     $display("OS Mode: PE[0][0] Accumulator = %0d (Expected: 55)", get_pe_acc(0,0));
     if (get_pe_acc(0,0) !== 32'd55) begin

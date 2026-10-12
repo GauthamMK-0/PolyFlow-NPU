@@ -28,6 +28,7 @@ task automatic run_test_concurrent_ws();
     step_clk(); // Cycle 3: Reg A += 15=45,  Reg B += 14=42
     step_clk(); // Cycle 4: Reg A += 15=60,  Reg B += 14=56
     compute_en = 2'b00;
+    step_clk(); // Pipeline drain cycle: drains final stage into accumulator
 
     $display("Region A (PE[0][0]) Accumulator = %0d (Expected: 60)", get_pe_acc(0,0));
     $display("Region B (PE[0][2]) Accumulator = %0d (Expected: 56)", get_pe_acc(0,2));

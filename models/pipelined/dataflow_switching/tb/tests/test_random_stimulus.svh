@@ -49,6 +49,7 @@ task automatic run_test_random_stimulus();
         step_clk();
     end
     tile_compute_en = 0;
+    step_clk(); // Pipeline drain cycle: drains final stage into accumulator
 
     for (int r = 0; r < NUM_ROWS; r++) begin
         for (int c = 0; c < NUM_COLS; c++) begin
@@ -91,6 +92,7 @@ task automatic run_test_random_stimulus();
         step_clk();
     end
     tile_compute_en = 0;
+    step_clk(); // Pipeline drain cycle: drains final stage into accumulator
 
     for (int r = 0; r < NUM_ROWS; r++) begin
         for (int c = 0; c < NUM_COLS; c++) begin
@@ -138,6 +140,7 @@ task automatic run_test_random_stimulus();
         step_clk();
     end
     tile_compute_en = 0;
+    step_clk(); // Pipeline drain cycle: drains final stage into accumulator
 
     for (int r = 0; r < NUM_ROWS; r++) begin
         for (int c = 0; c < NUM_COLS; c++) begin

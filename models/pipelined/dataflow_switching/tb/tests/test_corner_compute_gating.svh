@@ -15,10 +15,12 @@ task automatic run_test_corner_compute_gating();
     step_clk();
     tile_w_ld = 0;
 
-    // Cycle 1: Compute enabled -> acc accumulates 5 * 3 = 15
+    // Cycle 1: Compute enabled -> acc accumulates 5 * 3 = 15 (2-stage pipelined)
     tile_compute_en = 1;
     for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd3);
     step_clk();
+    tile_compute_en = 0;
+    step_clk(); // Drains stage 1 into accumulator
     $display("Cycle 1 (Active): PE[0][0] Acc = %0d (Expected: 15)", get_pe_acc(0,0));
     if (get_pe_acc(0,0) !== 32'd15) begin
         $display("ERROR: Active compute cycle mismatch: %0d", get_pe_acc(0,0));
@@ -41,6 +43,8 @@ task automatic run_test_corner_compute_gating();
     tile_compute_en = 1;
     for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd4);
     step_clk();
+    tile_compute_en = 0;
+    step_clk(); // Drains stage 1 into accumulator
     $display("Cycle 3 (Resumed): PE[0][0] Acc = %0d (Expected: 35)", get_pe_acc(0,0));
     if (get_pe_acc(0,0) !== 32'd35) begin
         $display("ERROR: Compute resume mismatch: %0d", get_pe_acc(0,0));

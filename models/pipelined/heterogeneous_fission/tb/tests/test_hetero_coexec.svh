@@ -44,6 +44,7 @@ task automatic run_test_hetero_coexec();
     // Cycle 4: Region A continues compute (x_A=3) -> acc = 45+15 = 60
     for (int r = 0; r < NUM_ROWS; r++) set_din_w_a(r, 8'd3);
     step_clk();
+    step_clk(); // Pipeline drain cycle: drains final stage into accumulator
 
     $display("Region A (WS Mode, PE[0][0]) Accumulator = %0d (Expected: 60)", get_pe_acc(0,0));
     $display("Region B (OS Mode, PE[0][2]) Accumulator = %0d (Expected: 40)", get_pe_acc(0,2));
@@ -76,6 +77,7 @@ task automatic run_test_hetero_coexec();
         set_din_w_b(r, 8'd7);
     end
     step_clk();
+    step_clk(); // Pipeline drain cycle: drains final stage into accumulator
 
     $display("Part 2: Region A (IS Mode, PE[0][0]) Acc = %0d (Expected: 24)", get_pe_acc(0,0));
     $display("Part 2: Region B (WS Mode, PE[0][2]) Acc = %0d (Expected: 35)", get_pe_acc(0,2));
@@ -109,6 +111,7 @@ task automatic run_test_hetero_coexec();
         set_din_w_b(r, 8'd3);
     end
     step_clk();
+    step_clk(); // Pipeline drain cycle: drains final stage into accumulator
 
     $display("Part 3: Region A (OS Mode, PE[0][0]) Acc = %0d (Expected: 12)", get_pe_acc(0,0));
     $display("Part 3: Region B (IS Mode, PE[0][2]) Acc = %0d (Expected: 24)", get_pe_acc(0,2));

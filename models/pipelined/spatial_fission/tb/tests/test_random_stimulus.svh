@@ -57,6 +57,7 @@ task automatic run_test_random_stimulus();
         step_clk();
     end
     compute_en = 2'b00;
+    step_clk(); // Pipeline drain cycle: drains final stage into accumulator
 
     // Step 3: Self-checking verification across all PEs in both regions
     errors_in_test = 0;

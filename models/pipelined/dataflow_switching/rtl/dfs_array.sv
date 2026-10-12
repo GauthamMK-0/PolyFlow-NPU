@@ -61,7 +61,7 @@ module dfs_array #(
 
             dfs_pe #(
                 .DATA_W(DATA_W),
-                .ACC_W(ACC_W)
+                .ACC_W (ACC_W)
             ) u_pe (
                 .clk          (clk),
                 .rst_n        (rst_n),

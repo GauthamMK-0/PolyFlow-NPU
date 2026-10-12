@@ -55,6 +55,7 @@ Each PE in Model 3 combines:
 1. **3-Dataflow Multiplexers:** Switches between WS (`mul_a = stat_reg, mul_b = din_w`), OS (`mul_a = din_n, mul_b = din_w`), and IS (`mul_a = stat_reg, mul_b = din_w`) based on the region's dynamic mode.
 2. **In-Flight Lifetime Countdown Register (`lifetime_cnt`):** When regions shift boundaries, in-flight calculations must gracefully drain before new workloads enter. The lifetime counter decrements to 0 and cleanly gates the multiplier.
 3. **Bank Role Stale Flag (`bank_role_stale`):** Prevents PEs from reading un-scrubbed memory banks until the hardware scrub cycle finishes.
+4. **Two-Stage Pipelined MAC with Redundant Carry-Save Accumulator (CSA):** Decouples the 8x8 multiplier from the accumulator with an intermediate pipeline register (`product_reg`), and replaces the 32-bit ripple carry chain in the feedback loop with redundant `acc_sum` and `acc_carry` registers and a 3:2 CSA compressor, resolving output via `acc_out = acc_sum + acc_carry`.
 
 ### 2.2 2D Mesh with Dynamic Boundary Barrier (`hdf_array_grid.sv`)
 - Slices the physical grid at `cfg_split_col`.

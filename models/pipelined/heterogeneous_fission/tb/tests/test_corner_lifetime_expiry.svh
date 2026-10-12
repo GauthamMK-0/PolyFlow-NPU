@@ -56,6 +56,7 @@ task automatic run_test_corner_lifetime_expiry();
 
     for (int r = 0; r < NUM_ROWS; r++) set_din_w_a(r, 8'd4); // 10 * 4 = 40 -> acc = 60 + 40 = 100
     step_clk();
+    step_clk(); // Pipeline drain cycle: drains final stage into accumulator
     $display("Cycle 5 (Reloaded): PE[0][0] Acc = %0d (Expected: 100)", get_pe_acc(0,0));
 
     if (get_pe_acc(0,0) !== 32'd100) begin

@@ -26,6 +26,7 @@ task automatic run_test_ws_mode();
     step_clk(); // cycle 3: acc += 15 = 45
     step_clk(); // cycle 4: acc += 15 = 60
     tile_compute_en = 0;
+    step_clk(); // Pipeline drain cycle: drains final stage into accumulator
 
     $display("WS Mode: PE[0][0] Accumulator = %0d (Expected: 60)", get_pe_acc(0,0));
     if (get_pe_acc(0,0) !== 32'd60) begin

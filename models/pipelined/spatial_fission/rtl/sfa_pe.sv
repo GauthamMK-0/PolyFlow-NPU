@@ -31,7 +31,6 @@ module sfa_pe #(
 );
 
     logic [DATA_W-1:0] stat_weight;
-    logic [ACC_W-1:0]  mac_acc;
 
     // Bank role stale handshake (protects against reading stale un-scrubbed memory)
     always_ff @(posedge clk or negedge rst_n) begin
@@ -53,32 +52,72 @@ module sfa_pe #(
         end
     end
 
-    // Computation control & multiplication
+    // --- Stage 1: Multiplication with Pipeline Register ---
     wire compute_active = compute_en && !bank_role_stale;
     wire signed [DATA_W-1:0] mul_a = $signed(stat_weight);
     wire signed [DATA_W-1:0] mul_b = $signed(din_w);
 
-    logic signed [2*DATA_W-1:0] product;
-    logic signed [ACC_W-1:0]    product_sext;
+    logic signed [2*DATA_W-1:0] product_raw;
+    logic signed [2*DATA_W-1:0] product_reg;
+    logic                       compute_pipe;
 
-    assign product      = mul_a * mul_b;
-    assign product_sext = {{ (ACC_W - 2*DATA_W){product[2*DATA_W-1]} }, product};
-
-    wire do_accumulate   = compute_active;
+    assign product_raw = mul_a * mul_b;
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            mac_acc <= '0;
+            product_reg  <= '0;
+            compute_pipe <= 1'b0;
         end else if (acc_clr) begin
-            mac_acc <= '0;
-        end else if (do_accumulate) begin
-            mac_acc <= mac_acc + product_sext;
+            product_reg  <= '0;
+            compute_pipe <= 1'b0;
+        end else begin
+            product_reg  <= product_raw;
+            compute_pipe <= compute_active;
+        end
+    end
+
+    wire signed [ACC_W-1:0] product_sext = {{ (ACC_W - 2*DATA_W){product_reg[2*DATA_W-1]} }, product_reg};
+
+    // --- Stage 2: Redundant Carry-Save Accumulator (CSA) ---
+    logic [ACC_W-1:0] acc_sum;
+    logic [ACC_W-1:0] acc_carry;
+
+    wire [ACC_W-1:0] next_csa_sum;
+    wire [ACC_W-1:0] next_csa_carry;
+
+    genvar i;
+    generate
+        for (i = 0; i < ACC_W; i++) begin : gen_csa
+            wire a_bit = acc_sum[i];
+            wire b_bit = acc_carry[i];
+            wire c_bit = product_sext[i];
+
+            assign next_csa_sum[i] = a_bit ^ b_bit ^ c_bit;
+            if (i < ACC_W-1) begin : gen_csa_carry
+                assign next_csa_carry[i+1] = (a_bit & b_bit) | (b_bit & c_bit) | (a_bit & c_bit);
+            end
+        end
+    endgenerate
+    assign next_csa_carry[0] = 1'b0;
+
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            acc_sum   <= '0;
+            acc_carry <= '0;
+        end else if (acc_clr) begin
+            acc_sum   <= '0;
+            acc_carry <= '0;
+        end else if (compute_pipe) begin
+            acc_sum   <= next_csa_sum;
+            acc_carry <= next_csa_carry;
         end
     end
 
     // Systolic forward passing
     assign dout_s  = din_n;
     assign dout_e  = din_w;
-    assign acc_out = mac_acc;
+
+    // Resolved accumulator output
+    assign acc_out = acc_sum + acc_carry;
 
 endmodule

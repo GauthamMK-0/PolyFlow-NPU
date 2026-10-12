@@ -17,13 +17,15 @@ task automatic run_test_corner_compute_gating();
     step_clk();
     w_ld = 2'b00;
 
-    // Cycle 1: Both enabled (2'b11) -> Reg A accumulates 15, Reg B accumulates 14
+    // Cycle 1: Both enabled (2'b11) -> Reg A accumulates 15, Reg B accumulates 14 (2-stage pipelined)
     compute_en = 2'b11;
     for (int r = 0; r < NUM_ROWS; r++) begin
         set_din_w_a(r, 8'd3);
         set_din_w_b(r, 8'd2);
     end
     step_clk();
+    compute_en = 2'b00;
+    step_clk(); // Drains stage 1 into accumulator
     $display("Cycle 1 (Both Active): Reg A PE[0][0]=%0d, Reg B PE[0][2]=%0d", get_pe_acc(0,0), get_pe_acc(0,2));
     if (get_pe_acc(0,0) !== 32'd15 || get_pe_acc(0,2) !== 32'd14) begin
         $display("ERROR: Cycle 1 active compute mismatch!");
@@ -52,6 +54,8 @@ task automatic run_test_corner_compute_gating();
         set_din_w_b(r, 8'd2);
     end
     step_clk();
+    compute_en = 2'b00;
+    step_clk(); // Drains stage 1 into accumulator
     $display("Cycle 3 (Reg A Only): Reg A PE[0][0]=%0d (Exp: 30), Reg B PE[0][2]=%0d (Exp: 14)", get_pe_acc(0,0), get_pe_acc(0,2));
     if (get_pe_acc(0,0) !== 32'd30 || get_pe_acc(0,2) !== 32'd14) begin
         $display("ERROR: Region A only compute mismatch!");
@@ -65,6 +69,8 @@ task automatic run_test_corner_compute_gating();
         set_din_w_b(r, 8'd2);
     end
     step_clk();
+    compute_en = 2'b00;
+    step_clk(); // Drains stage 1 into accumulator
     $display("Cycle 4 (Reg B Only): Reg A PE[0][0]=%0d (Exp: 30), Reg B PE[0][2]=%0d (Exp: 28)", get_pe_acc(0,0), get_pe_acc(0,2));
     if (get_pe_acc(0,0) !== 32'd30 || get_pe_acc(0,2) !== 32'd28) begin
         $display("ERROR: Region B only compute mismatch!");

@@ -29,8 +29,8 @@ module dfs_top #(
 );
 
     dfs_array #(
-        .DATA_W(DATA_W),
-        .ACC_W(ACC_W),
+        .DATA_W  (DATA_W),
+        .ACC_W   (ACC_W),
         .NUM_ROWS(NUM_ROWS),
         .NUM_COLS(NUM_COLS)
     ) u_array (
