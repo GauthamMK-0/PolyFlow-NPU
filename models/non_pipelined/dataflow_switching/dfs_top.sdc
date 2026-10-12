@@ -18,9 +18,4 @@ set_output_delay 0.500 -clock clk [all_outputs]
 set_driving_cell -lib_cell INVX1 [all_inputs -no_clocks]
 set_load 0.010 [all_outputs]
 
-# --- False Path Optimizations ---
-# 1. Asynchronous active-low reset
-set_false_path -from [get_ports rst_n]
 
-# 2. Quasi-static configuration signals (set once at dispatch, held constant during compute)
-set_false_path -from [get_ports cfg_dataflow_mode*]

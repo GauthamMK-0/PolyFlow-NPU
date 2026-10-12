@@ -28,38 +28,24 @@ read_hdl -sv {
 elaborate sfa_top
 init_design
 
-# --- Force Array Flattening for Global Datapath Optimization ---
-set_db auto_ungroup both
-catch { ungroup -all -flatten }
-
 # --- Load Timing Constraints ---
 if {[file exists sfa_top.sdc]} {
     read_sdc sfa_top.sdc
-    # Explicitly enforce multicycle path on reconfiguration registers (3-cycle setup, 2-cycle hold)
-    catch { set_multicycle_path 3 -setup -from [get_cells -hier *region_id_mask*] }
-    catch { set_multicycle_path 2 -hold  -from [get_cells -hier *region_id_mask*] }
 } else {
     # Default fallback: 200 MHz / 5.000 ns clock on clk
     create_clock -name clk -period 5.000 [get_ports clk]
+    set_clock_uncertainty 0.050 [get_clocks clk]
+    set_clock_transition  0.050 [get_clocks clk]
     set_input_delay  0.500 -clock clk [all_inputs -no_clocks]
     set_output_delay 0.500 -clock clk [all_outputs]
-    set_false_path -from [get_ports rst_n]
-    set_false_path -from [get_ports cfg_split_col*]
-    set_false_path -from [get_ports cfg_update_strobe]
-    set_false_path -from [get_ports phase_tag*]
-    set_false_path -from [get_ports role_reassign*]
-    set_false_path -from [get_ports new_region_id_per_bank*]
-    set_false_path -from [get_ports new_role_per_bank*]
-    catch { set_multicycle_path 3 -setup -from [get_cells -hier *region_id_mask*] }
-    catch { set_multicycle_path 2 -hold  -from [get_cells -hier *region_id_mask*] }
+    set_driving_cell -lib_cell INVX1 [all_inputs -no_clocks]
+    set_load 0.010 [all_outputs]
 }
 
 # --- Synthesis Effort Controls ---
-set_db syn_generic_effort high
-set_db syn_map_effort high
-set_db syn_opt_effort high
-set_db dp_analytical_opt extreme
-set_db dp_sharing advanced
+set_db syn_generic_effort medium
+set_db syn_map_effort medium
+set_db syn_opt_effort medium
 
 # --- Synthesis Execution ---
 syn_generic
@@ -82,7 +68,7 @@ write_sdc > netlist/sfa_top_netlist.sdc
 write_sdf -timescale ns -nonegchecks -recrem split -edges check_edge -setuphold split > netlist/sfa_top_netlist.sdf
 
 puts "=================================================================="
-puts " [SYNTHESIS EXECUTIVE SUMMARY: sfa_top @ 200 MHz]"
+puts " \[SYNTHESIS EXECUTIVE SUMMARY: sfa_top @ 200 MHz\]"
 puts "=================================================================="
 report_qor
 report_area

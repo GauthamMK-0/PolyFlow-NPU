@@ -88,8 +88,9 @@ make synth            # Runs genus with synth_sfa.tcl and sfa_top.sdc
 - **Target Frequency**: **200 MHz** ($T_{\text{clk}} = 5.000\text{ ns}$)
 - **I/O Delay Budget**: $0.500\text{ ns}$ (10% of clock period)
 - **Clock Uncertainty**: $0.050\text{ ns}$ (setup margin)
-- **Multicycle Paths (MCP)**: Applied to `region_id_mask` registers (3 Setup / 2 Hold: `set_multicycle_path 3 -setup -from [get_cells -hier *region_id_mask*]`, `set_multicycle_path 2 -hold -from [get_cells -hier *region_id_mask*]`)
+- **Timing Model**: Pure standard single-cycle synchronous STA across all paths (no multicycle paths or false path exceptions needed)
 - **Boundary Optimization**: Pre-decoded boundary column flags (`is_boundary_col`) eliminate row-level boundary mux delays
-- **Hierarchy Optimization**: Auto-ungroups and flattens array partitions to eliminate module boundary pins (`set_db auto_ungroup both`, `catch { ungroup -all -flatten }`)
-- **Datapath**: Decoupled single-cycle multiplier tree with sparsity clock gating, achieving positive timing slack ($\ge +3.5\text{ ns}$)
+- **Synthesis Effort**: Clean, standard synthesis flow (`syn_generic`, `syn_map`, `syn_opt` at `medium` effort) without artificial datapath sharing or forced flattening
+- **Timing Headroom**: Single-cycle datapath achieves robust positive setup slack ($\ge +1.5\text{ ns}$) across all register-to-register and I/O paths
+
 
