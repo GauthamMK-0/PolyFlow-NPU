@@ -40,40 +40,22 @@ models/non_pipelined/heterogeneous_fission/
 
 ## Verification & Simulation
 
-### Test Suite & Verification Matrix
-The test harness (`tb/hdf_top_tb.sv`) implements a modular hybrid verification architecture:
-- `test_split_partition.svh`: Dynamic dispatch-time column partitioning (Cols 0-1: Reg A, Cols 2-3: Reg B).
-- `test_hetero_coexec.svh`: Heterogeneous co-execution across WS+OS, IS+WS, and OS+IS dataflow pairs.
-- `test_eppa_phase_arb.svh`: EPPA memory bandwidth allocation across BURST, STREAM, IDLE, and RECONFIG phases with urgency flags.
-- `test_mem_scrub_migration.svh`: Memory bank migration with mandatory 4-cycle hardware zeroing scrub.
-- `test_corner_lifetime_expiry.svh`: Tenant hardware lifetime expiration countdown and automatic PE compute clamping to zero.
-- `test_corner_bank_contention.svh`: Concurrent multi-tenant memory bank contention with mutual exclusion and starvation avoidance.
-- `test_corner_reconfig_split.svh`: Dynamic online array fission across boundary columns 0, 1, 2, 3, 4.
-- `test_random_stimulus.svh`: Constrained-random stimulus with automated self-checking against a golden mathematical model.
-- `hdf_coverage_monitor.svh`: Dual-compatible functional coverage engine with IEEE 1800 covergroups for Cadence IMC and active bin tracker (**30 / 30 bins = 100.0% coverage**).
+### Testbench Architecture (`tb/hdf_top_tb.sv`)
+The self-contained SystemVerilog testbench validates the core architectural features:
+1. **Dynamic Column Partitioning:** Slices array at column 2 and verifies `region_id_mask = 1100`.
+2. **Concurrent Heterogeneous Execution:** Simultaneously executes Region A in Weight-Stationary (WS) mode and Region B in Output-Stationary (OS) mode with verified mathematical correctness.
+3. **EPPA Memory Bandwidth Arbitration:** Arbitrates bandwidth dynamically based on phase profiles (`BURST` vs `STREAM`).
+4. **Memory Bank Ownership Migration & Scrubbing:** Validates the 4-cycle hardware zeroing scrub sequence and `bank_role_clear` handshake.
 
-### Using Cadence Xcelium (xrun)
+### Simulation Commands
 ```bash
 cd models/non_pipelined/heterogeneous_fission
-make run              # Headless batch mode (default)
-make gui              # Interactive GUI mode with SimVision
-make run TEST=coexec  # Run specific testcase (e.g. lifetime, contention, reconfig, random)
-make clean            # Clean output/ sandbox and log files
-```
-
-### Using Verilator
-```bash
-cd models/non_pipelined/heterogeneous_fission
-verilator -j $(nproc) --binary --timing -Wall -Itb -Itb/tests \
-    rtl/*.sv tb/hdf_top_tb.sv --top-module hdf_top_tb -o Vhdf_top_tb
-./obj_dir/Vhdf_top_tb +TEST=ALL
-```
-
-### Using Icarus Verilog (Alternative)
-```bash
-cd models/non_pipelined/heterogeneous_fission
-iverilog -g2012 -I tb -I tb/tests -o tb/hdf_top_tb.vvp rtl/*.sv tb/hdf_top_tb.sv
-vvp tb/hdf_top_tb.vvp +TEST=ALL
+make run         # Cadence Xcelium simulation (default, headless)
+make gui         # Cadence Xcelium with SimVision GUI
+make iverilog    # Fast simulation using Icarus Verilog (< 1s)
+make verilator   # Cycle-accurate simulation using Verilator
+make lint        # Strict Verilator linting (-Wall --timing)
+make clean       # Clean simulation sandbox and log files
 ```
 
 ---

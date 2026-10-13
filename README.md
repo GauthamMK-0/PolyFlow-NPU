@@ -110,10 +110,10 @@ Navigate into any model directory (`cd models/pipelined/<model_name>` or `cd mod
 | `make lint-verilator` | Run strict Verilator linting (`--lint-only -Wall`) on the model's RTL and TB | Strict `-Wall`, `--timing` |
 | `make lint-cadence` | Run Cadence HAL linting on the model's RTL and TB | Cadence environment |
 | `make lint` | Run default lint check (aliases to `lint-verilator`) | — |
-| `make run` | Launch Cadence Xcelium (`xrun`) simulation in headless batch mode | Default (`GUI=0`), `TEST=ALL` |
+| `make run` | Launch Cadence Xcelium (`xrun`) simulation in headless batch mode | Default (`GUI=0`) |
 | `make gui` | Launch Cadence Xcelium (`xrun`) simulation with SimVision GUI | `GUI=1` (Interactive) |
-| `make run GUI=1` | Launch Cadence Xcelium with SimVision GUI | `GUI=1` |
-| `make run TEST=ws` | Run specific targeted testcase in Cadence Xcelium | `TEST=ws`, `os`, `is`, `split`, `coexec` |
+| `make iverilog` | Fast simulation using Icarus Verilog (< 1s) | Open-source |
+| `make verilator` | High-performance cycle-accurate simulation with Verilator | C++ compiled |
 | `make synth` | Run Cadence Genus ASIC logic synthesis mapped to target library (`slow.lib`) | Generates netlist & reports |
 | `make clean` | Clean up all simulation sandboxes, waveform databases (`waves.shm`), and reports | Full model cleanup |
 | `make help` | Display interactive target help menu | — |
@@ -132,12 +132,16 @@ make lint
 make run-model1                     # Model 1: Dataflow Switching (Single-Tenant)
 make run-model2                     # Model 2: Spatial Fission (Homogeneous WS)
 make run-model3                     # Model 3: Heterogeneous Fission (PolyFlow-NPU)
-make run-model3 TEST=coexec         # Run targeted testcase on Model 3
 make run-all                        # Run all models sequentially
 
 # 2b. Optional Interactive GUI Mode (SimVision):
 make gui-model3                     # Launch Model 3 in SimVision GUI
 make run-model3 GUI=1               # Equivalent GUI invocation
+
+# 2c. Fast Icarus Verilog Simulation:
+make iverilog-model1                # Model 1 with Icarus Verilog
+make iverilog-model2                # Model 2 with Icarus Verilog
+make iverilog-model3                # Model 3 with Icarus Verilog
 
 # 3. Cadence Genus Logic Synthesis:
 make synth-model1                   # Synthesize dfs_top (generates netlist/ & reports/)
@@ -153,11 +157,9 @@ If you wish to simulate all models sequentially from the repository root:
 ```bash
 # High-speed C++ cycle-accurate simulation with Verilator:
 ./scripts/run_all_models.sh verilator all
-./scripts/run_all_models.sh verilator pipelined ws   # Run only WS testcase
 
 # Industry-standard ASIC simulation with Cadence Xcelium:
 ./scripts/run_all_models.sh xrun all
-./scripts/run_all_models.sh xrun pipelined coexec   # Run specific testcase
 
 # Event-driven simulation with Icarus Verilog:
 ./scripts/run_all_models.sh iverilog all

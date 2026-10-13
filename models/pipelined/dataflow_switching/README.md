@@ -32,37 +32,21 @@ models/pipelined/dataflow_switching/
 
 ## Verification & Simulation
 
-### Test Suite & Verification Matrix
-The test harness (`tb/dfs_top_tb.sv`) implements a modular hybrid verification architecture:
-- `test_ws_mode.svh`: Weight-Stationary (WS) execution with stationary weight preload and partial sum accumulation.
-- `test_os_mode.svh`: Output-Stationary (OS) execution with dual streaming operands (Q from North, K from West).
-- `test_is_mode.svh`: Input-Stationary (IS) execution with stationary input preload and streaming weights.
-- `test_corner_compute_gating.svh`: Compute enable gating and accumulator freeze verification.
-- `test_random_stimulus.svh`: Multi-cycle constrained-random stimulus across all 3 dataflows self-checked against a golden model.
-- `dfs_coverage_monitor.svh`: Dual-compatible functional coverage engine with IEEE 1800 covergroups for Cadence IMC and active bin tracker (**15 / 15 bins = 100.0% coverage**).
+### Testbench Architecture (`tb/dfs_top_tb.sv`)
+The self-contained SystemVerilog testbench validates runtime dataflow switching across all three dataflow configurations:
+1. **Weight-Stationary (WS) Mode:** Preloads stationary weights from West port and streams inputs from North port; verifies accumulated dot products.
+2. **Output-Stationary (OS) Mode:** Streams queries from North and keys from West simultaneously; accumulates results locally.
+3. **Input-Stationary (IS) Mode:** Preloads stationary activations from North port and streams weights from West; verifies accumulated dot products.
 
-### Using Cadence Xcelium (xrun)
+### Simulation Commands
 ```bash
 cd models/pipelined/dataflow_switching
-make run           # Headless batch mode (default)
-make gui           # Interactive GUI mode with SimVision
-make run TEST=ws   # Run specific testcase (e.g. ws, os, is, gating, random)
-make clean         # Clean output/ sandbox and log files
-```
-
-### Using Verilator
-```bash
-cd models/pipelined/dataflow_switching
-verilator -j $(nproc) --binary --timing -Wall -Itb -Itb/tests \
-    rtl/*.sv tb/dfs_top_tb.sv --top-module dfs_top_tb -o Vdfs_top_tb
-./obj_dir/Vdfs_top_tb +TEST=ALL
-```
-
-### Using Icarus Verilog (Alternative)
-```bash
-cd models/pipelined/dataflow_switching
-iverilog -g2012 -I tb -I tb/tests -o tb/dfs_top_tb.vvp rtl/*.sv tb/dfs_top_tb.sv
-vvp tb/dfs_top_tb.vvp +TEST=ALL
+make run         # Cadence Xcelium simulation (default, headless)
+make gui         # Cadence Xcelium with SimVision GUI
+make iverilog    # Fast simulation using Icarus Verilog (< 1s)
+make verilator   # Cycle-accurate simulation using Verilator
+make lint        # Strict Verilator linting (-Wall --timing)
+make clean       # Clean simulation sandbox and log files
 ```
 
 ---

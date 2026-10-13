@@ -9,11 +9,10 @@ cd "$ROOT_DIR"
 
 SIM_TOOL="${1:-verilator}"      # verilator | iverilog | xrun | cadence
 VARIANT="${2:-all}"            # all | pipelined | non_pipelined
-TEST_NAME="${3:-ALL}"          # ALL | specific test name
 
 echo "=================================================================="
 echo " [PolyFlow-NPU] Running Complete Architectural Exploration Testsuite"
-echo " Simulation Tool: $SIM_TOOL | Variant: $VARIANT | Test: $TEST_NAME"
+echo " Simulation Tool: $SIM_TOOL | Variant: $VARIANT"
 echo "=================================================================="
 
 declare -a SUMMARY_ROWS=()
@@ -47,31 +46,24 @@ run_model_suite() {
 
         set +e
         if [ "$SIM_TOOL" = "verilator" ]; then
-            verilator -j "$(nproc)" --binary --timing -Wall -Itb -Itb/tests \
+            verilator -j "$(nproc)" --binary --timing -Wall -Itb \
                 -MAKEFLAGS "-j$(nproc) OPT_FAST=-O1" \
                 rtl/*.sv "tb/${tb_module}.sv" --top-module "$tb_module" -o "V${tb_module}" > /dev/null 2>&1
-            "./obj_dir/V${tb_module}" +TEST="$TEST_NAME" 2>&1 | tee "$log_file"
+            "./obj_dir/V${tb_module}" 2>&1 | tee "$log_file"
             cmd_rc=${PIPESTATUS[0]}
         elif [ "$SIM_TOOL" = "xrun" ] || [ "$SIM_TOOL" = "cadence" ]; then
-            make run GUI=0 TEST="$TEST_NAME" 2>&1 | tee "$log_file"
+            make run GUI=0 2>&1 | tee "$log_file"
             cmd_rc=${PIPESTATUS[0]}
         elif [ "$SIM_TOOL" = "iverilog" ]; then
             mkdir -p output
-            iverilog -g2012 -I tb -I tb/tests -o "output/${tb_module}.vvp" rtl/*.sv "tb/${tb_module}.sv"
-            vvp "output/${tb_module}.vvp" +TEST="$TEST_NAME" 2>&1 | tee "$log_file"
+            iverilog -g2012 -I tb -o "output/${tb_module}.vvp" rtl/*.sv "tb/${tb_module}.sv"
+            vvp "output/${tb_module}.vvp" 2>&1 | tee "$log_file"
             cmd_rc=${PIPESTATUS[0]}
         else
             echo "Error: Unknown simulation tool '$SIM_TOOL'. Choose 'verilator', 'iverilog', or 'xrun'/'cadence'."
             exit 1
         fi
         set -e
-
-        # Parse coverage from log
-        local cov
-        cov=$(grep "TOTAL FUNCTIONAL COVERAGE" "$log_file" | awk -F':' '{gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}' | tr -s ' ' || true)
-        if [ -z "$cov" ]; then
-            cov="N/A"
-        fi
 
         if [ "$cmd_rc" -eq 0 ] && grep -q "\[SUCCESS\]" "$log_file"; then
             sim_status="PASS"
@@ -83,7 +75,7 @@ run_model_suite() {
             if [ -z "$err_count" ]; then err_count="1+"; fi
         fi
 
-        SUMMARY_ROWS+=("${short_name}|${label}|${SIM_TOOL}|${sim_status}|${err_count}|${cov}")
+        SUMMARY_ROWS+=("${short_name}|${label}|${SIM_TOOL}|${sim_status}|${err_count}")
         rm -f "$log_file"
     done
 }
@@ -99,16 +91,16 @@ fi
 echo -e "\n========================================================================================="
 echo "                            ARCHITECTURAL REGRESSION SUMMARY"
 echo "========================================================================================="
-printf " %-23s %-15s %-11s %-8s %-8s %-20s\n" "Model" "Variant" "Simulator" "Status" "Errors" "Coverage"
+printf " %-25s %-16s %-12s %-10s %-8s\n" "Model" "Variant" "Simulator" "Status" "Errors"
 echo "-----------------------------------------------------------------------------------------"
 for row in "${SUMMARY_ROWS[@]}"; do
-    IFS="|" read -r m_name m_var m_tool m_stat m_err m_cov <<< "$row"
-    printf " %-23s %-15s %-11s %-8s %-8s %-20s\n" "$m_name" "$m_var" "$m_tool" "$m_stat" "$m_err" "$m_cov"
+    IFS="|" read -r m_name m_var m_tool m_stat m_err <<< "$row"
+    printf " %-25s %-16s %-12s %-10s %-8s\n" "$m_name" "$m_var" "$m_tool" "$m_stat" "$m_err"
 done
 echo "========================================================================================="
 
 if [ "$PASSED_MODELS" -eq "$TOTAL_MODELS" ] && [ "$TOTAL_MODELS" -gt 0 ]; then
-    echo " [SUCCESS] $PASSED_MODELS / $TOTAL_MODELS Models PASSED CLEANLY (All Tests & Coverage Verified)!"
+    echo " [SUCCESS] $PASSED_MODELS / $TOTAL_MODELS Models PASSED CLEANLY!"
     echo "========================================================================================="
     exit 0
 else

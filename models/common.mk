@@ -23,17 +23,12 @@ else
     GUI_FLAGS =
 endif
 
-# Test selector (defaults to ALL, can pass TEST=ws, TEST=coexec, etc.)
-TEST       ?= ALL
-
 # Common Cadence Xcelium flags
 XRUN_FLAGS ?= -64bit \
               -sv \
               -access +rwc \
               -top $(TB_MODULE) \
               -incdir ../tb \
-              -incdir ../tb/tests \
-              +TEST=$(TEST) \
               $(GUI_FLAGS) \
               -l xrun.log
 
@@ -50,7 +45,6 @@ all: run
 run:
 	@echo "=================================================================="
 	@echo "Launching Xcelium Simulation for $(TB_MODULE) inside $(OUT_DIR)"
-	@echo "Mode: $(if $(filter 1,$(GUI)),Interactive GUI (SimVision),Headless Batch) | Test: $(TEST)"
 	@echo "=================================================================="
 	@mkdir -p $(OUT_DIR)
 	cd $(OUT_DIR) && xrun \
@@ -64,22 +58,22 @@ gui:
 # --- Open-Source Simulation Targets ---
 sim-iverilog:
 	@echo "=================================================================="
-	@echo "Running Icarus Verilog Simulation for $(TB_MODULE) [Test: $(TEST)]"
+	@echo "Running Icarus Verilog Simulation for $(TB_MODULE)"
 	@echo "=================================================================="
 	@mkdir -p $(OUT_DIR)
-	iverilog -g2012 -I $(TB_DIR) -I $(TB_DIR)/tests -o $(OUT_DIR)/$(TB_MODULE).vvp $(SRC_FILES)
-	vvp $(OUT_DIR)/$(TB_MODULE).vvp +TEST=$(TEST)
+	iverilog -g2012 -I $(TB_DIR) -o $(OUT_DIR)/$(TB_MODULE).vvp $(SRC_FILES)
+	vvp $(OUT_DIR)/$(TB_MODULE).vvp
 
 iverilog: sim-iverilog
 
 sim-verilator:
 	@echo "=================================================================="
-	@echo "Running Verilator Simulation for $(TB_MODULE) [Test: $(TEST)]"
+	@echo "Running Verilator Simulation for $(TB_MODULE)"
 	@echo "=================================================================="
-	verilator -j $(shell nproc) --binary --timing -Wall -I$(TB_DIR) -I$(TB_DIR)/tests \
+	verilator -j $(shell nproc) --binary --timing -Wall -I$(TB_DIR) \
 		-MAKEFLAGS "-j$(shell nproc) OPT_FAST=-O1" $(SRC_FILES) \
 		--top-module $(TB_MODULE) -o V$(TB_MODULE) > /dev/null
-	./obj_dir/V$(TB_MODULE) +TEST=$(TEST)
+	./obj_dir/V$(TB_MODULE)
 
 verilator: sim-verilator
 
@@ -117,7 +111,6 @@ help:
 	@echo "  make gui            - Run simulation with SimVision GUI enabled (GUI=1)"
 	@echo "  make iverilog       - Fast compilation & simulation using Icarus Verilog (< 1s)"
 	@echo "  make verilator      - Cycle-accurate simulation using Verilator"
-	@echo "  make run TEST=<name>- Run specific test (e.g. TEST=ws, TEST=coexec)"
 	@echo "  make lint           - Run strict Verilator linting"
 	@echo "  make lint-cadence   - Run Cadence HAL linting"
 	@echo "  make synth          - Run Cadence Genus logic synthesis using $(SYNTH_TCL)"

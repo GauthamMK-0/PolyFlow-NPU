@@ -9,9 +9,6 @@ MODEL_VARIANT ?= pipelined
 # Simulation mode: 1 (SimVision GUI) or 0 (Headless batch mode)
 GUI           ?= 0
 
-# Testcase selector: ALL (default) or specific sub-test (e.g. ws, os, is, split, coexec)
-TEST          ?= ALL
-
 .PHONY: help all lint lint-verilator lint-cadence \
         run-model1 run-model2 run-model3 run-all \
         iverilog-model1 iverilog-model2 iverilog-model3 \
@@ -25,85 +22,80 @@ all: help
 help:
 	@echo "=================================================================="
 	@echo " PolyFlow-NPU Master Automation Makefile"
-	@echo " Active Variant: $(MODEL_VARIANT) | GUI: $(GUI) | Test: $(TEST)"
+	@echo " Active Variant: $(MODEL_VARIANT) | GUI: $(GUI)"
 	@echo "=================================================================="
 	@echo " Cadence Xcelium Simulation Targets:"
-	@echo "   make run-model1 [GUI=0/1] [TEST=...]  - Run Model 1: Dataflow Switching"
-	@echo "   make run-model2 [GUI=0/1] [TEST=...]  - Run Model 2: Spatial Fission"
-	@echo "   make run-model3 [GUI=0/1] [TEST=...]  - Run Model 3: Heterogeneous Fission"
-	@echo "   make run-all    [GUI=0/1] [TEST=...]  - Run all 3 models sequentially"
+	@echo "   make run-model1 [GUI=0/1]   - Run Model 1: Dataflow Switching"
+	@echo "   make run-model2 [GUI=0/1]   - Run Model 2: Spatial Fission"
+	@echo "   make run-model3 [GUI=0/1]   - Run Model 3: Heterogeneous Fission"
+	@echo "   make run-all    [GUI=0/1]   - Run all 3 models sequentially"
 	@echo ""
 	@echo " Fast Icarus Verilog Simulation Shortcuts (< 1s):"
-	@echo "   make iverilog-model1 [TEST=...]       - Run Model 1 with Icarus"
-	@echo "   make iverilog-model2 [TEST=...]       - Run Model 2 with Icarus"
-	@echo "   make iverilog-model3 [TEST=...]       - Run Model 3 with Icarus"
+	@echo "   make iverilog-model1        - Run Model 1 with Icarus"
+	@echo "   make iverilog-model2        - Run Model 2 with Icarus"
+	@echo "   make iverilog-model3        - Run Model 3 with Icarus"
 	@echo ""
 	@echo " Verilator Cycle Simulation Shortcuts:"
-	@echo "   make verilator-model1 [TEST=...]      - Run Model 1 with Verilator"
-	@echo "   make verilator-model2 [TEST=...]      - Run Model 2 with Verilator"
-	@echo "   make verilator-model3 [TEST=...]      - Run Model 3 with Verilator"
+	@echo "   make verilator-model1       - Run Model 1 with Verilator"
+	@echo "   make verilator-model2       - Run Model 2 with Verilator"
+	@echo "   make verilator-model3       - Run Model 3 with Verilator"
 	@echo ""
 	@echo " Cadence Genus Logic Synthesis Targets:"
-	@echo "   make synth-model1                     - Synthesize Model 1 netlist & reports"
-	@echo "   make synth-model2                     - Synthesize Model 2 netlist & reports"
-	@echo "   make synth-model3                     - Synthesize Model 3 netlist & reports"
-	@echo "   make synth-all                        - Synthesize all 3 models sequentially"
+	@echo "   make synth-model1           - Synthesize Model 1 netlist & reports"
+	@echo "   make synth-model2           - Synthesize Model 2 netlist & reports"
+	@echo "   make synth-model3           - Synthesize Model 3 netlist & reports"
+	@echo "   make synth-all              - Synthesize all 3 models sequentially"
 	@echo ""
 	@echo " Multi-Model Linting & Verification Targets:"
-	@echo "   make lint                             - Run strict Verilator linting across all models"
-	@echo "   make lint-verilator                   - Run strict Verilator linting across all models"
-	@echo "   make lint-cadence                     - Run Cadence HAL linting across all models"
-	@echo ""
-	@echo " Automated Batch Simulation Suite:"
-	@echo "   make sim-verilator [TEST=...]         - Run all models with Verilator"
-	@echo "   make sim-iverilog  [TEST=...]         - Run all models with Icarus Verilog"
-	@echo "   make sim-xrun      [TEST=...]         - Run all models with Cadence Xcelium"
+	@echo "   make lint                   - Run strict Verilator linting across all models"
+	@echo "   make lint-verilator         - Run strict Verilator linting across all models"
+	@echo "   make lint-cadence           - Run Cadence HAL linting across all models"
 	@echo ""
 	@echo " Maintenance:"
-	@echo "   make clean                            - Clean build artifacts across all models"
+	@echo "   make clean                  - Clean build artifacts across all models"
 	@echo "=================================================================="
 
 # --- Cadence Xcelium Simulation Targets ---
 run-model1:
-	@$(MAKE) -C models/$(MODEL_VARIANT)/dataflow_switching run GUI=$(GUI) TEST=$(TEST)
+	@$(MAKE) -C models/$(MODEL_VARIANT)/dataflow_switching run GUI=$(GUI)
 
 run-model2:
-	@$(MAKE) -C models/$(MODEL_VARIANT)/spatial_fission run GUI=$(GUI) TEST=$(TEST)
+	@$(MAKE) -C models/$(MODEL_VARIANT)/spatial_fission run GUI=$(GUI)
 
 run-model3:
-	@$(MAKE) -C models/$(MODEL_VARIANT)/heterogeneous_fission run GUI=$(GUI) TEST=$(TEST)
+	@$(MAKE) -C models/$(MODEL_VARIANT)/heterogeneous_fission run GUI=$(GUI)
 
 run-all: run-model1 run-model2 run-model3
 
 # --- Fast Icarus Verilog Simulation Shortcuts ---
 iverilog-model1:
-	@$(MAKE) -C models/$(MODEL_VARIANT)/dataflow_switching iverilog TEST=$(TEST)
+	@$(MAKE) -C models/$(MODEL_VARIANT)/dataflow_switching iverilog
 
 iverilog-model2:
-	@$(MAKE) -C models/$(MODEL_VARIANT)/spatial_fission iverilog TEST=$(TEST)
+	@$(MAKE) -C models/$(MODEL_VARIANT)/spatial_fission iverilog
 
 iverilog-model3:
-	@$(MAKE) -C models/$(MODEL_VARIANT)/heterogeneous_fission iverilog TEST=$(TEST)
+	@$(MAKE) -C models/$(MODEL_VARIANT)/heterogeneous_fission iverilog
 
 # --- Verilator Cycle Simulation Shortcuts ---
 verilator-model1:
-	@$(MAKE) -C models/$(MODEL_VARIANT)/dataflow_switching verilator TEST=$(TEST)
+	@$(MAKE) -C models/$(MODEL_VARIANT)/dataflow_switching verilator
 
 verilator-model2:
-	@$(MAKE) -C models/$(MODEL_VARIANT)/spatial_fission verilator TEST=$(TEST)
+	@$(MAKE) -C models/$(MODEL_VARIANT)/spatial_fission verilator
 
 verilator-model3:
-	@$(MAKE) -C models/$(MODEL_VARIANT)/heterogeneous_fission verilator TEST=$(TEST)
+	@$(MAKE) -C models/$(MODEL_VARIANT)/heterogeneous_fission verilator
 
 # --- Optional GUI Shortcuts (SimVision) ---
 gui-model1:
-	@$(MAKE) run-model1 GUI=1 TEST=$(TEST)
+	@$(MAKE) run-model1 GUI=1
 
 gui-model2:
-	@$(MAKE) run-model2 GUI=1 TEST=$(TEST)
+	@$(MAKE) run-model2 GUI=1
 
 gui-model3:
-	@$(MAKE) run-model3 GUI=1 TEST=$(TEST)
+	@$(MAKE) run-model3 GUI=1
 
 # --- Cadence Genus Synthesis Targets ---
 synth-model1:
@@ -140,13 +132,13 @@ lint-cadence:
 
 # --- Open-Source & Batch Simulation ---
 sim-verilator:
-	./scripts/run_all_models.sh verilator all $(TEST)
+	./scripts/run_all_models.sh verilator all
 
 sim-iverilog:
-	./scripts/run_all_models.sh iverilog all $(TEST)
+	./scripts/run_all_models.sh iverilog all
 
 sim-xrun:
-	./scripts/run_all_models.sh xrun all $(TEST)
+	./scripts/run_all_models.sh xrun all
 
 # --- Clean Target ---
 clean:
