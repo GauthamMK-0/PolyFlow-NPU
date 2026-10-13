@@ -46,7 +46,7 @@ In a normal systolic array, PE outputs pass combinationally from left to right. 
 
 To prevent this, the boundary PE at column `cfg_split_col` severs the connection from the left and routes to a dedicated input pin (`din_w_region_b`):
 $$\text{Input to Col } c = \begin{cases} \text{din\_w\_region\_b} & \text{if crossing the boundary} \\ \text{mesh output from left} & \text{otherwise} \end{cases}$$
-This provides **electrical isolation**: Region A and Region B run completely independently with **zero cross-talk**.
+This provides **spatial isolation**: Region A and Region B run completely independently across the partition.
 
 ---
 

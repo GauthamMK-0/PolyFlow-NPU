@@ -209,7 +209,7 @@ module sfa_top_tb;
             $display("ERROR: Concurrent execution calculation mismatch!");
             error_count++;
         end else begin
-            $display("PASS: Both regions co-executed successfully with zero cross-talk (combinational).");
+            $display("PASS: Both regions co-executed successfully (combinational).");
         end
         compute_en = 2'b00;
 

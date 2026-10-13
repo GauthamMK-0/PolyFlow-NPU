@@ -83,7 +83,7 @@ Here is the exact cycle trace from our verified testbench:
 | **0** | Split at Col 2. Mode set to WS (`00`). Clear acc. | Split at Col 2. Mode set to OS (`01`). Clear acc. | Boundary barrier active at Col 2 |
 | **1** | Preload weight $W_A = 5$. Set lifetime = 15. | Set lifetime = 15. Accumulator ready. | EPPA: Region A in BURST (0xFF BW) |
 | **2** | Stream activation $X_A = 3$. <br/>`acc_A = 0 + (5 * 3) = 15` | Stream $Q = 4$ (North) and $K = 7$ (West). <br/>`acc_B = 0 + (4 * 7) = 28` | Both regions compute simultaneously! |
-| **3** | Stream activation $X_A = 3$. <br/>`acc_A = 15 + 15 = 30` | Stream $Q = 2$ (North) and $K = 6$ (West). <br/>`acc_B = 28 + (2 * 6) = 40` | Zero cross-talk across boundary |
+| **3** | Stream activation $X_A = 3$. <br/>`acc_A = 15 + 15 = 30` | Stream $Q = 2$ (North) and $K = 6$ (West). <br/>`acc_B = 28 + (2 * 6) = 40` | Boundary barrier isolation |
 | **4** | Stream activation $X_A = 3$. <br/>`acc_A = 30 + 15 = 45` | Attention tile complete. Acc holds score `40`. | EPPA shifts memory BW to Region B |
 | **5** | Stream activation $X_A = 3$. <br/>`acc_A = 45 + 15 = 60` | Standby / Result drain. | Region A final result = `60` |
 

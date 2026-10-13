@@ -40,7 +40,7 @@ models/non_pipelined/spatial_fission/
 ### Testbench Architecture (`tb/sfa_top_tb.sv`)
 The self-contained SystemVerilog testbench validates the core architectural features:
 1. **Dynamic Column Partitioning:** Configures `cfg_split_col = 2` and verifies `region_id_mask = 1100`.
-2. **Concurrent Execution:** Executes Region A and Region B concurrently (both in Weight-Stationary mode) with zero cross-talk across the partition boundary.
+2. **Concurrent Execution:** Executes Region A and Region B concurrently (both in Weight-Stationary mode) across the partitioned boundary.
 3. **EPPA Memory Bandwidth Arbitration:** Validates dynamic bandwidth allocation across differing tenant memory phases.
 4. **Shared Memory Scrubbing:** Validates the 4-cycle hardware zeroing scrub sequence and `bank_role_clear` handshake.
 
