@@ -72,11 +72,34 @@ if {$CELL_LEF eq ""} {
     set CELL_LEF [file normalize "${FOUNDRY_PATH}/lef/gsclib090_macro.lef"]
 }
 
-puts "INFO: Tech LEF: $TECH_LEF"
-puts "INFO: Cell LEF: $CELL_LEF"
+# Resolution for TARGET_LIB (timing library for setup analysis)
+set LIB_CANDIDATES [list \
+    [expr {[info exists env(TARGET_LIB)] ? $env(TARGET_LIB) : ""}] \
+    "${FOUNDRY_PATH}/lib/slow.lib" \
+    "./slow.lib" \
+    "../slow.lib" \
+    "../../slow.lib" \
+    "lib/slow.lib" \
+    "${FOUNDRY_PATH}/lib/gsclib090_slow.lib" \
+    "./gsclib090_slow.lib" \
+    "${FOUNDRY_PATH}/lib/typical.lib" \
+    "./typical.lib" \
+]
 
-# Target timing library
-set TARGET_LIB [expr {[info exists env(TARGET_LIB)] ? $env(TARGET_LIB) : "${FOUNDRY_PATH}/lib/slow.lib"}]
+set TARGET_LIB ""
+foreach cand $LIB_CANDIDATES {
+    if {$cand ne "" && [file exists $cand]} {
+        set TARGET_LIB [file normalize $cand]
+        break
+    }
+}
+if {$TARGET_LIB eq ""} {
+    set TARGET_LIB [file normalize "${FOUNDRY_PATH}/lib/slow.lib"]
+}
+
+puts "INFO: Tech LEF:    $TECH_LEF"
+puts "INFO: Cell LEF:    $CELL_LEF"
+puts "INFO: Target LIB:  $TARGET_LIB"
 
 # --- 4. Robust Netlist Resolution ---
 set NETLIST_CANDIDATES [list \
