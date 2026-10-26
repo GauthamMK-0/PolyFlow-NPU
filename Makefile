@@ -14,6 +14,7 @@ GUI           ?= 0
         iverilog-model1 iverilog-model2 iverilog-model3 \
         verilator-model1 verilator-model2 verilator-model3 \
         synth-model1 synth-model2 synth-model3 synth-all \
+        pnr-place-model1 pnr-place-model2 pnr-place-model3 pnr-place-all \
         sim-verilator sim-iverilog sim-xrun clean
 
 # Default target
@@ -45,6 +46,12 @@ help:
 	@echo "   make synth-model2           - Synthesize Model 2 netlist & reports"
 	@echo "   make synth-model3           - Synthesize Model 3 netlist & reports"
 	@echo "   make synth-all              - Synthesize all 3 models sequentially"
+	@echo ""
+	@echo " Cadence Innovus Standard Cell Placement Targets:"
+	@echo "   make pnr-place-model1       - Run Innovus placement for Model 1"
+	@echo "   make pnr-place-model2       - Run Innovus placement for Model 2"
+	@echo "   make pnr-place-model3       - Run Innovus placement for Model 3"
+	@echo "   make pnr-place-all          - Run Innovus placement across all 3 models"
 	@echo ""
 	@echo " Multi-Model Linting & Verification Targets:"
 	@echo "   make lint                   - Run strict Verilator linting across all models"
@@ -108,6 +115,18 @@ synth-model3:
 	@$(MAKE) -C models/$(MODEL_VARIANT)/heterogeneous_fission synth
 
 synth-all: synth-model1 synth-model2 synth-model3
+
+# --- Cadence Innovus Placement Targets ---
+pnr-place-model1:
+	@$(MAKE) -C models/$(MODEL_VARIANT)/dataflow_switching pnr-place
+
+pnr-place-model2:
+	@$(MAKE) -C models/$(MODEL_VARIANT)/spatial_fission pnr-place
+
+pnr-place-model3:
+	@$(MAKE) -C models/$(MODEL_VARIANT)/heterogeneous_fission pnr-place
+
+pnr-place-all: pnr-place-model1 pnr-place-model2 pnr-place-model3
 
 # --- Linting Targets ---
 lint: lint-verilator

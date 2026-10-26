@@ -36,7 +36,7 @@ XRUN_FLAGS ?= -64bit \
 # Targets
 # ==============================================================================
 .PHONY: all run gui clean help lint lint-verilator lint-cadence synth \
-        sim-iverilog iverilog sim-verilator verilator
+        sim-iverilog iverilog sim-verilator verilator pnr-place
 
 # Default target: Headless simulation
 all: run
@@ -99,10 +99,19 @@ synth:
 	@echo "=================================================================="
 	genus -f $(SYNTH_TCL) -log genus_$(TOP_MODULE).log
 
+# --- Physical Design (Placement) Target ---
+PNR_PLACE_TCL ?= pnr_place.tcl
+
+pnr-place:
+	@echo "=================================================================="
+	@echo "Launching Cadence Innovus Placement for $(TOP_MODULE)"
+	@echo "=================================================================="
+	innovus -files $(PNR_PLACE_TCL) -log innovus_$(TOP_MODULE)_place.log
+
 # --- Cleanup Target ---
 clean:
 	@echo "Cleaning up $(TOP_MODULE) simulation sandbox, logs, and reports..."
-	rm -rf $(OUT_DIR) obj_dir *.vvp xcelium.d waves.shm .simvision xrun.history xrun.log genus* fv/ *.rpt *_netlist.* reports/ netlist/
+	rm -rf $(OUT_DIR) obj_dir *.vvp xcelium.d waves.shm .simvision xrun.history xrun.log genus* innovus* fv/ db/ *.rpt *_netlist.* reports/ netlist/
 
 # --- Help Target ---
 help:
@@ -114,4 +123,5 @@ help:
 	@echo "  make lint           - Run strict Verilator linting"
 	@echo "  make lint-cadence   - Run Cadence HAL linting"
 	@echo "  make synth          - Run Cadence Genus logic synthesis using $(SYNTH_TCL)"
+	@echo "  make pnr-place      - Run Cadence Innovus standard cell placement using $(PNR_PLACE_TCL)"
 	@echo "  make clean          - Delete sandbox, waveforms, and log files"
