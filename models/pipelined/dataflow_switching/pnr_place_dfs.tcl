@@ -189,24 +189,60 @@ floorPlan -site CoreSite -r 1.0 0.70 10.0 10.0 10.0 10.0
 # --- 9. Power Planning: Rings & Standard Cell Rails (SRoute) ---
 puts "--- Phase 4: Power Planning (Core Rings & SRoute) ---"
 
-catch {
-    addRing -nets {VDD VSS} -type core_rings -follow core \
-        -layer {top Metal6 bottom Metal6 left Metal5 right Metal5} \
-        -width 2.0 -spacing 1.0 -offset 2.0
-} ring_err
-if {[info exists ring_err] && $ring_err ne ""} {
-    puts "addRing note: $ring_err (continuing)"
+# Dynamically query active routing layers from loaded LEF database
+set routing_layers [list]
+catch { set routing_layers [get_db [get_db layers -if {.type == routing}] .name] }
+if {[llength $routing_layers] == 0} {
+    catch { set routing_layers [dbGet [dbGet -p head.layers.type routing].name] }
 }
 
-catch {
-    sroute -connect { corePin } \
-        -layerChangeRange { Metal1 Metal6 } \
-        -blockPinTarget { nearestTarget } \
-        -corePinTarget { firstAfterRowEnd } \
-        -nets { VDD VSS }
-} sroute_err
-if {[info exists sroute_err] && $sroute_err ne ""} {
-    puts "sroute note: $sroute_err (continuing)"
+# If database query returns empty, fallback to standard gsclib090 lowercase names (metal1..metal6)
+if {[llength $routing_layers] == 0} {
+    set routing_layers [list "metal1" "metal2" "metal3" "metal4" "metal5" "metal6"]
+}
+
+set num_layers [llength $routing_layers]
+set bot_layer  [lindex $routing_layers 0]
+set top_layer  [lindex $routing_layers end]
+
+puts "INFO: Detected routing layers in LEF: $routing_layers (Total: $num_layers)"
+
+if {$num_layers >= 2} {
+    if {$num_layers >= 6} {
+        set ring_horiz [lindex $routing_layers 5]
+        set ring_vert  [lindex $routing_layers 4]
+    } elseif {$num_layers >= 4} {
+        set ring_horiz [lindex $routing_layers 3]
+        set ring_vert  [lindex $routing_layers 2]
+    } else {
+        set ring_horiz [lindex $routing_layers 1]
+        set ring_vert  [lindex $routing_layers 0]
+    }
+
+    puts "INFO: Power Ring Layers -> Horizontal: $ring_horiz, Vertical: $ring_vert"
+    puts "INFO: SRoute Layer Range -> $bot_layer to $top_layer"
+
+    catch {
+        addRing -nets {VDD VSS} -type core_rings -follow core \
+            -layer [list top $ring_horiz bottom $ring_horiz left $ring_vert right $ring_vert] \
+            -width 2.0 -spacing 1.0 -offset 2.0
+    } ring_err
+    if {[info exists ring_err] && $ring_err ne ""} {
+        puts "addRing note: $ring_err (continuing to placement)"
+    }
+
+    catch {
+        sroute -connect { corePin } \
+            -layerChangeRange [list $bot_layer $top_layer] \
+            -blockPinTarget { nearestTarget } \
+            -corePinTarget { firstAfterRowEnd } \
+            -nets { VDD VSS }
+    } sroute_err
+    if {[info exists sroute_err] && $sroute_err ne ""} {
+        puts "sroute note: $sroute_err (continuing to placement)"
+    }
+} else {
+    puts "INFO: No multi-layer routing stack defined in LEF. Skipping power rings and proceeding to placement."
 }
 
 # --- 10. Standard Cell Placement & Pre-CTS Optimization ---
