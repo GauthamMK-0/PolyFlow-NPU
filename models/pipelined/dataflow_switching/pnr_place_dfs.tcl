@@ -26,37 +26,32 @@ puts "=================================================================="
 # --- 3. Technology & Library Paths ---
 set FOUNDRY_PATH [expr {[info exists env(FOUNDRY_PATH)] ? $env(FOUNDRY_PATH) : "/home/cadence/install/FOUNDRY/digital/90nm/dig"}]
 
-# Resolution for macro.lef (only use gsclib090_macro.lef / macro.lef)
-set MACRO_LEF_CANDIDATES [list \
-    [expr {[info exists env(MACRO_LEF)] ? $env(MACRO_LEF) : ""}] \
-    [expr {[info exists env(CELL_LEF)]  ? $env(CELL_LEF)  : ""}] \
-    "gsclib090_macro.lef" \
-    "./gsclib090_macro.lef" \
-    "../gsclib090_macro.lef" \
-    "../../gsclib090_macro.lef" \
-    "lef/gsclib090_macro.lef" \
-    "${FOUNDRY_PATH}/lef/gsclib090_macro.lef" \
-    "macro.lef" \
-    "./macro.lef" \
-    "../macro.lef" \
-    "../../macro.lef" \
-    "lef/macro.lef" \
-    "${FOUNDRY_PATH}/lef/macro.lef" \
+# Resolution for translated.lef (as specified by user)
+set LEF_CANDIDATES [list \
+    [expr {[info exists env(LEF_FILE)] ? $env(LEF_FILE) : ""}] \
+    "translated.lef" \
+    "./translated.lef" \
+    "../translated.lef" \
+    "../../translated.lef" \
+    "lef/translated.lef" \
+    "${FOUNDRY_PATH}/lef/translated.lef" \
+    "translated_ref.lef" \
+    "./translated_ref.lef" \
+    "../translated_ref.lef" \
+    "../../translated_ref.lef" \
+    "lef/translated_ref.lef" \
+    "${FOUNDRY_PATH}/lef/translated_ref.lef" \
 ]
 
-set MACRO_LEF ""
-foreach cand $MACRO_LEF_CANDIDATES {
+set LEF_FILE ""
+foreach cand $LEF_CANDIDATES {
     if {$cand ne "" && [file exists $cand]} {
-        set MACRO_LEF [file normalize $cand]
+        set LEF_FILE [file normalize $cand]
         break
     }
 }
-if {$MACRO_LEF eq ""} {
-    if {[file exists "gsclib090_macro.lef"]} {
-        set MACRO_LEF [file normalize "gsclib090_macro.lef"]
-    } else {
-        set MACRO_LEF [file normalize "${FOUNDRY_PATH}/lef/gsclib090_macro.lef"]
-    }
+if {$LEF_FILE eq ""} {
+    set LEF_FILE [file normalize "translated.lef"]
 }
 
 # Resolution for TARGET_LIB (timing library for setup analysis)
@@ -84,7 +79,7 @@ if {$TARGET_LIB eq ""} {
     set TARGET_LIB [file normalize "${FOUNDRY_PATH}/lib/slow.lib"]
 }
 
-puts "INFO: Macro LEF:   $MACRO_LEF"
+puts "INFO: LEF File:    $LEF_FILE"
 puts "INFO: Target LIB:  $TARGET_LIB"
 
 # --- 4. Robust Netlist Resolution ---
@@ -170,8 +165,8 @@ set init_pwr_net "VDD"
 set init_verilog $NETLIST_FILE
 set init_top_cell $TOP_MODULE
 
-# Only use the macro.lef file as requested
-set init_lef_file [list $MACRO_LEF]
+# Use translated.lef as requested
+set init_lef_file [list $LEF_FILE]
 set init_mmmc_file $MMMC_FILE
 
 init_design -setup {default_analysis_view} -hold {default_analysis_view}
