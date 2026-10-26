@@ -111,7 +111,7 @@ pnr-place:
 # --- Cleanup Target ---
 clean:
 	@echo "Cleaning up $(TOP_MODULE) simulation sandbox, logs, and reports..."
-	rm -rf $(OUT_DIR) obj_dir *.vvp xcelium.d waves.shm .simvision xrun.history xrun.log genus* innovus* fv/ db/ *.rpt *_netlist.* reports/ netlist/
+	rm -rf $(OUT_DIR) obj_dir *.vvp xcelium.d waves.shm .simvision xrun.history xrun.log genus* innovus* fv/ db/ *.rpt reports/ *_fallback.sdc viewDefinition*
 
 # --- Help Target ---
 help:

@@ -32,3 +32,10 @@ local/
 *.dot
 *.aux
 *.out
+
+# Ensure gate-level netlists, SDC, and SDF files are tracked in git
+!**/netlist/
+!**/netlist/**
+!*_netlist.*
+!*.sdc
+!*.sdf

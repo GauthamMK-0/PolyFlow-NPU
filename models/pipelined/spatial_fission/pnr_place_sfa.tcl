@@ -26,21 +26,21 @@ puts "=================================================================="
 # --- 3. Technology & Library Paths ---
 set FOUNDRY_PATH [expr {[info exists env(FOUNDRY_PATH)] ? $env(FOUNDRY_PATH) : "/home/cadence/install/FOUNDRY/digital/90nm/dig"}]
 
-# Resolution for translated.lef (as specified by user)
+# Resolution for gsclib090_translated.lef (only use gsclib090_translated.lef)
 set LEF_CANDIDATES [list \
     [expr {[info exists env(LEF_FILE)] ? $env(LEF_FILE) : ""}] \
+    "gsclib090_translated.lef" \
+    "./gsclib090_translated.lef" \
+    "../gsclib090_translated.lef" \
+    "../../gsclib090_translated.lef" \
+    "lef/gsclib090_translated.lef" \
+    "${FOUNDRY_PATH}/lef/gsclib090_translated.lef" \
     "translated.lef" \
     "./translated.lef" \
     "../translated.lef" \
     "../../translated.lef" \
     "lef/translated.lef" \
     "${FOUNDRY_PATH}/lef/translated.lef" \
-    "translated_ref.lef" \
-    "./translated_ref.lef" \
-    "../translated_ref.lef" \
-    "../../translated_ref.lef" \
-    "lef/translated_ref.lef" \
-    "${FOUNDRY_PATH}/lef/translated_ref.lef" \
 ]
 
 set LEF_FILE ""
@@ -51,7 +51,7 @@ foreach cand $LEF_CANDIDATES {
     }
 }
 if {$LEF_FILE eq ""} {
-    set LEF_FILE [file normalize "translated.lef"]
+    set LEF_FILE [file normalize "gsclib090_translated.lef"]
 }
 
 # Resolution for TARGET_LIB (timing library for setup analysis)
