@@ -1,6 +1,6 @@
 # ==============================================================================
 # Cadence Innovus Physical Design Script: Up to Standard Cell Placement
-# Target: 90nm Standard Cell Library
+# Target: 90nm Standard Cell Library (gsclib090)
 # Design: dfs_top (Model 1: Single-Tenant Dataflow Switching)
 # Flow: Design Init -> Floorplan -> Power Rings/SRoute -> Placement & Pre-CTS Opt
 # ==============================================================================
@@ -20,14 +20,60 @@ catch { setMultiCpuUsage -localCpu $MULTI_CPU -keepLicense true }
 
 puts "=================================================================="
 puts " Innovus Placement Flow for: $TOP_MODULE"
-puts " Target: 90nm Technology | CPUs: $MULTI_CPU"
+puts " Target: 90nm gsclib090 Technology | CPUs: $MULTI_CPU"
 puts "=================================================================="
 
 # --- 3. Technology & Library Paths ---
 set FOUNDRY_PATH [expr {[info exists env(FOUNDRY_PATH)] ? $env(FOUNDRY_PATH) : "/home/cadence/install/FOUNDRY/digital/90nm/dig"}]
-set TECH_LEF     [expr {[info exists env(TECH_LEF)]     ? $env(TECH_LEF)     : "${FOUNDRY_PATH}/lef/technology.lef"}]
-set CELL_LEF     [expr {[info exists env(CELL_LEF)]     ? $env(CELL_LEF)     : "${FOUNDRY_PATH}/lef/slow.lef"}]
-set TARGET_LIB   [expr {[info exists env(TARGET_LIB)]   ? $env(TARGET_LIB)   : "${FOUNDRY_PATH}/lib/slow.lib"}]
+
+# Resolution for tech.lef (must be loaded FIRST in Innovus)
+set TECH_LEF_CANDIDATES [list \
+    [expr {[info exists env(TECH_LEF)] ? $env(TECH_LEF) : ""}] \
+    "${FOUNDRY_PATH}/lef/tech.lef" \
+    "./tech.lef" \
+    "../tech.lef" \
+    "../../tech.lef" \
+    "lef/tech.lef" \
+    "${FOUNDRY_PATH}/lef/technology.lef" \
+]
+
+set TECH_LEF ""
+foreach cand $TECH_LEF_CANDIDATES {
+    if {$cand ne "" && [file exists $cand]} {
+        set TECH_LEF [file normalize $cand]
+        break
+    }
+}
+if {$TECH_LEF eq ""} {
+    set TECH_LEF [file normalize "${FOUNDRY_PATH}/lef/tech.lef"]
+}
+
+# Resolution for gsclib090_macro.lef (must be loaded SECOND in Innovus)
+set CELL_LEF_CANDIDATES [list \
+    [expr {[info exists env(CELL_LEF)] ? $env(CELL_LEF) : ""}] \
+    "${FOUNDRY_PATH}/lef/gsclib090_macro.lef" \
+    "./gsclib090_macro.lef" \
+    "../gsclib090_macro.lef" \
+    "../../gsclib090_macro.lef" \
+    "lef/gsclib090_macro.lef" \
+    "${FOUNDRY_PATH}/lef/slow.lef" \
+]
+
+set CELL_LEF ""
+foreach cand $CELL_LEF_CANDIDATES {
+    if {$cand ne "" && [file exists $cand]} {
+        set CELL_LEF [file normalize $cand]
+        break
+    }
+}
+if {$CELL_LEF eq ""} {
+    set CELL_LEF [file normalize "${FOUNDRY_PATH}/lef/gsclib090_macro.lef"]
+}
+
+puts "INFO: Tech LEF: $TECH_LEF"
+puts "INFO: Cell LEF: $CELL_LEF"
+
+set TARGET_LIB [expr {[info exists env(TARGET_LIB)] ? $env(TARGET_LIB) : "${FOUNDRY_PATH}/lib/slow.lib"}]
 
 # --- 4. Robust Netlist Resolution ---
 set NETLIST_CANDIDATES [list \
@@ -112,11 +158,8 @@ set init_pwr_net "VDD"
 set init_verilog $NETLIST_FILE
 set init_top_cell $TOP_MODULE
 
-set LEF_LIST [list]
-if {[file exists $TECH_LEF]} { lappend LEF_LIST [file normalize $TECH_LEF] } else { lappend LEF_LIST $TECH_LEF }
-if {[file exists $CELL_LEF]} { lappend LEF_LIST [file normalize $CELL_LEF] } else { lappend LEF_LIST $CELL_LEF }
-set init_lef_file $LEF_LIST
-
+# Order strictly enforced: tech.lef FIRST, gsclib090_macro.lef SECOND
+set init_lef_file [list $TECH_LEF $CELL_LEF]
 set init_mmmc_file $MMMC_FILE
 
 init_design -setup {default_analysis_view} -hold {default_analysis_view}

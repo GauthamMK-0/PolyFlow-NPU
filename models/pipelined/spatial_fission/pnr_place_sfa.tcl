@@ -1,6 +1,6 @@
 # ==============================================================================
 # Cadence Innovus Physical Design Script: Up to Standard Cell Placement
-# Target: 90nm Standard Cell Library
+# Target: 90nm Standard Cell Library (gsclib090)
 # Design: sfa_top (Model 2: Homogeneous Spatial Fission)
 # Flow: Design Init -> Floorplan -> Power Rings/SRoute -> Placement & Pre-CTS Opt
 # ==============================================================================
@@ -20,14 +20,63 @@ catch { setMultiCpuUsage -localCpu $MULTI_CPU -keepLicense true }
 
 puts "=================================================================="
 puts " Innovus Placement Flow for: $TOP_MODULE"
-puts " Target: 90nm Technology | CPUs: $MULTI_CPU"
+puts " Target: 90nm gsclib090 Technology | CPUs: $MULTI_CPU"
 puts "=================================================================="
 
 # --- 3. Technology & Library Paths ---
 set FOUNDRY_PATH [expr {[info exists env(FOUNDRY_PATH)] ? $env(FOUNDRY_PATH) : "/home/cadence/install/FOUNDRY/digital/90nm/dig"}]
-set TECH_LEF     [expr {[info exists env(TECH_LEF)]     ? $env(TECH_LEF)     : "${FOUNDRY_PATH}/lef/technology.lef"}]
-set CELL_LEF     [expr {[info exists env(CELL_LEF)]     ? $env(CELL_LEF)     : "${FOUNDRY_PATH}/lef/slow.lef"}]
-set TARGET_LIB   [expr {[info exists env(TARGET_LIB)]   ? $env(TARGET_LIB)   : "${FOUNDRY_PATH}/lib/slow.lib"}]
+
+# Resolution for tech.lef (must be loaded FIRST in Innovus)
+set TECH_LEF_CANDIDATES [list \
+    [expr {[info exists env(TECH_LEF)] ? $env(TECH_LEF) : ""}] \
+    "${FOUNDRY_PATH}/lef/tech.lef" \
+    "./tech.lef" \
+    "../tech.lef" \
+    "../../tech.lef" \
+    "lef/tech.lef" \
+    "${FOUNDRY_PATH}/lef/technology.lef" \
+]
+
+set TECH_LEF ""
+foreach cand $TECH_LEF_CANDIDATES {
+    if {$cand ne "" && [file exists $cand]} {
+        set TECH_LEF [file normalize $cand]
+        break
+    }
+}
+if {$TECH_LEF eq ""} {
+    # Default to standard foundry path if not found locally
+    set TECH_LEF [file normalize "${FOUNDRY_PATH}/lef/tech.lef"]
+}
+
+# Resolution for gsclib090_macro.lef (must be loaded SECOND in Innovus)
+set CELL_LEF_CANDIDATES [list \
+    [expr {[info exists env(CELL_LEF)] ? $env(CELL_LEF) : ""}] \
+    "${FOUNDRY_PATH}/lef/gsclib090_macro.lef" \
+    "./gsclib090_macro.lef" \
+    "../gsclib090_macro.lef" \
+    "../../gsclib090_macro.lef" \
+    "lef/gsclib090_macro.lef" \
+    "${FOUNDRY_PATH}/lef/slow.lef" \
+]
+
+set CELL_LEF ""
+foreach cand $CELL_LEF_CANDIDATES {
+    if {$cand ne "" && [file exists $cand]} {
+        set CELL_LEF [file normalize $cand]
+        break
+    }
+}
+if {$CELL_LEF eq ""} {
+    # Default to standard foundry path if not found locally
+    set CELL_LEF [file normalize "${FOUNDRY_PATH}/lef/gsclib090_macro.lef"]
+}
+
+puts "INFO: Tech LEF: $TECH_LEF"
+puts "INFO: Cell LEF: $CELL_LEF"
+
+# Target timing library
+set TARGET_LIB [expr {[info exists env(TARGET_LIB)] ? $env(TARGET_LIB) : "${FOUNDRY_PATH}/lib/slow.lib"}]
 
 # --- 4. Robust Netlist Resolution ---
 set NETLIST_CANDIDATES [list \
@@ -52,7 +101,6 @@ if {$NETLIST_FILE eq ""} {
     puts "Please run Genus synthesis first using: 'make synth-model2'"
     puts "Expected file: netlist/${TOP_MODULE}_netlist.v"
     puts "=================================================================="
-    # Fallback to local reference to allow script parsing
     set NETLIST_FILE [file normalize "netlist/${TOP_MODULE}_netlist.v"]
 } else {
     puts "INFO: Using gate-level netlist: $NETLIST_FILE"
@@ -108,25 +156,17 @@ close $fp_mmmc
 # --- 7. Design Initialization (init_design) ---
 puts "--- Phase 2: Design Initialization ---"
 
-# Set global Innovus initialization variables
 set init_gnd_net "VSS"
 set init_pwr_net "VDD"
 set init_verilog $NETLIST_FILE
 set init_top_cell $TOP_MODULE
 
-# Build LEF file list with normalization
-set LEF_LIST [list]
-if {[file exists $TECH_LEF]} { lappend LEF_LIST [file normalize $TECH_LEF] } else { lappend LEF_LIST $TECH_LEF }
-if {[file exists $CELL_LEF]} { lappend LEF_LIST [file normalize $CELL_LEF] } else { lappend LEF_LIST $CELL_LEF }
-set init_lef_file $LEF_LIST
-
-# Point init_mmmc_file to the generated MMMC script
+# Order strictly enforced: tech.lef FIRST, gsclib090_macro.lef SECOND
+set init_lef_file [list $TECH_LEF $CELL_LEF]
 set init_mmmc_file $MMMC_FILE
 
-# Execute Innovus design initialization
 init_design -setup {default_analysis_view} -hold {default_analysis_view}
 
-# Connect Global Power & Ground Nets
 clearGlobalNets
 globalNetConnect VDD -type pgpin -pin VDD -inst * -module {}
 globalNetConnect VSS -type pgpin -pin VSS -inst * -module {}
@@ -134,15 +174,12 @@ globalNetConnect VDD -type tiehi -inst * -module {}
 globalNetConnect VSS -type tielo -inst * -module {}
 
 # --- 8. Floorplanning ---
-# 70% core target utilization, 1.0 square aspect ratio matching systolic 2D grid
-# 10.0 um boundary margins for power rings and pad/pin routing
 puts "--- Phase 3: Floorplanning (Core Util: 70%, Margins: 10 um) ---"
 floorPlan -site CoreSite -r 1.0 0.70 10.0 10.0 10.0 10.0
 
 # --- 9. Power Planning: Rings & Standard Cell Rails (SRoute) ---
 puts "--- Phase 4: Power Planning (Core Rings & SRoute) ---"
 
-# Add core power ring (Metal5 vertical, Metal6 horizontal)
 catch {
     addRing -nets {VDD VSS} -type core_rings -follow core \
         -layer {top Metal6 bottom Metal6 left Metal5 right Metal5} \
@@ -152,7 +189,6 @@ if {[info exists ring_err] && $ring_err ne ""} {
     puts "addRing note: $ring_err (continuing)"
 }
 
-# Special Route (SRoute) standard cell row power/ground rails
 catch {
     sroute -connect { corePin } \
         -layerChangeRange { Metal1 Metal6 } \
@@ -167,18 +203,15 @@ if {[info exists sroute_err] && $sroute_err ne ""} {
 # --- 10. Standard Cell Placement & Pre-CTS Optimization ---
 puts "--- Phase 5: Standard Cell Placement & Pre-CTS Optimization ---"
 
-# Configure placement engine
 setPlaceMode -prerouteResourceBudget true \
              -timingDriven true \
              -congEffort high \
              -modulePadding 1.0
 
-# Run timing-driven placement and pre-CTS optimization
 catch {
     place_opt_design -prefix place
 } catch_err
 
-# Fallback to place_design if place_opt_design license/command is unavailable
 if {[info exists catch_err] && $catch_err ne ""} {
     puts "place_opt_design note: $catch_err. Attempting place_design fallback..."
     catch { place_design -concurrent }
