@@ -15,6 +15,7 @@ GUI           ?= 0
         verilator-model1 verilator-model2 verilator-model3 \
         synth-model1 synth-model2 synth-model3 synth-all \
         pnr-place-model1 pnr-place-model2 pnr-place-model3 pnr-place-all \
+        pnr-model1 pnr-model2 pnr-model3 pnr-all \
         sim-verilator sim-iverilog sim-xrun clean
 
 # Default target
@@ -116,7 +117,7 @@ synth-model3:
 
 synth-all: synth-model1 synth-model2 synth-model3
 
-# --- Cadence Innovus Placement Targets ---
+# --- Cadence Innovus Physical Design (PnR) Targets ---
 pnr-place-model1:
 	@$(MAKE) -C models/$(MODEL_VARIANT)/dataflow_switching pnr-place
 
@@ -127,6 +128,11 @@ pnr-place-model3:
 	@$(MAKE) -C models/$(MODEL_VARIANT)/heterogeneous_fission pnr-place
 
 pnr-place-all: pnr-place-model1 pnr-place-model2 pnr-place-model3
+
+pnr-model1: pnr-place-model1
+pnr-model2: pnr-place-model2
+pnr-model3: pnr-place-model3
+pnr-all: pnr-place-all
 
 # --- Linting Targets ---
 lint: lint-verilator
