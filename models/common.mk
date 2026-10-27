@@ -36,7 +36,7 @@ XRUN_FLAGS ?= -64bit \
 # Targets
 # ==============================================================================
 .PHONY: all run gui clean help lint lint-verilator lint-cadence synth \
-        sim-iverilog iverilog sim-verilator verilator pnr-place
+        sim-iverilog iverilog sim-verilator verilator pnr-place pnr
 
 # Default target: Headless simulation
 all: run
@@ -99,19 +99,22 @@ synth:
 	@echo "=================================================================="
 	genus -f $(SYNTH_TCL) -log genus_$(TOP_MODULE).log
 
-# --- Physical Design (Placement) Target ---
+# --- Physical Design (Innovus PnR) Target ---
 PNR_PLACE_TCL ?= pnr_place.tcl
+PNR_TCL       ?= $(PNR_PLACE_TCL)
 
 pnr-place:
 	@echo "=================================================================="
-	@echo "Launching Cadence Innovus Placement for $(TOP_MODULE)"
+	@echo "Launching Cadence Innovus Physical Design for $(TOP_MODULE)"
 	@echo "=================================================================="
 	innovus -files $(PNR_PLACE_TCL) -log innovus_$(TOP_MODULE)_place.log
+
+pnr: pnr-place
 
 # --- Cleanup Target ---
 clean:
 	@echo "Cleaning up $(TOP_MODULE) simulation sandbox, logs, and reports..."
-	rm -rf $(OUT_DIR) obj_dir *.vvp xcelium.d waves.shm .simvision xrun.history xrun.log genus* innovus* fv/ db/ *.rpt reports/ *_fallback.sdc viewDefinition*
+	rm -rf $(OUT_DIR) obj_dir *.vvp xcelium.d waves.shm .simvision xrun.history xrun.log genus* innovus* fv/ db/ *.rpt reports/ *_fallback.sdc viewDefinition* timingReports outputs/ ccopt* *.gds *.enc* *.spef *.sdf *.def *_postroute.*
 
 # --- Help Target ---
 help:
@@ -123,5 +126,6 @@ help:
 	@echo "  make lint           - Run strict Verilator linting"
 	@echo "  make lint-cadence   - Run Cadence HAL linting"
 	@echo "  make synth          - Run Cadence Genus logic synthesis using $(SYNTH_TCL)"
-	@echo "  make pnr-place      - Run Cadence Innovus standard cell placement using $(PNR_PLACE_TCL)"
+	@echo "  make pnr-place      - Run Cadence Innovus physical design flow using $(PNR_PLACE_TCL)"
+	@echo "  make pnr            - Alias for pnr-place (complete Innovus flow)"
 	@echo "  make clean          - Delete sandbox, waveforms, and log files"

@@ -3,6 +3,7 @@
 # ==============================================================================
 TOP_MODULE = hdf_top
 TB_MODULE  = hdf_top_tb
-SYNTH_TCL  = synth_hdf.tcl
+SYNTH_TCL      = synth_hdf.tcl
+PNR_PLACE_TCL  = pnr_place_hdf.tcl
 
 include ../../common.mk
