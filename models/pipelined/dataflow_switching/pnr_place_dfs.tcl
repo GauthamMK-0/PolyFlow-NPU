@@ -1,15 +1,20 @@
 # ============================================================================
-# SELF-ADAPTING INNOVUS SCRIPT FOR gsclib090_translated.lef
+# SELF-ADAPTING INNOVUS SCRIPT FOR gsclib090_translated.lef (FLOW TILL CTS)
 # Automatically detects Site Name, Metal Layers, Clocks, and Filler Cells
 # Target: 90nm Standard Cell Library (gsclib090)
-# Design: dfs_top (Model 1: Single-Tenant Dataflow Switching)
+# Design: dfs_top (Model 1: Single-Tenant Dataflow Switching (Pipelined))
+# MMMC: slow.lib (Setup), fast.lib (Hold), CapTable (Capacitance)
+# Flow Scope: Full Flow Till Clock Tree Synthesis (CTS) & Post-CTS Optimization
 # ============================================================================
 
 # ---> ONLY EDIT THESE 4 PATHS/NAMES <---
-set DESIGN_NAME  "dfs_top"                                     ;# Your top Verilog module name
-set NETLIST_FILE "netlist/dfs_top_netlist.v"                   ;# Your Genus synthesized netlist
-set LEF_FILES    "gsclib090_translated.lef"                   ;# If you have tech.lef, put it first: "tech.lef gsclib090_translated.lef"
-set MMMC_FILE    "viewDefinition_dfs_top.tcl"                 ;# Your MMMC file
+set DESIGN_NAME  "dfs_top"                                     ;# Top Verilog module name
+set NETLIST_FILE "netlist/dfs_top_netlist.v"                   ;# Genus synthesized gate-level netlist
+set LEF_FILES    "gsclib090_translated.lef"                   ;# LEF files ("tech.lef gsclib090_translated.lef")
+set MMMC_FILE    "viewDefinition_dfs_top.tcl"                         ;# MMMC configuration file
+
+# Execution Control: Set to 1 to complete flow at CTS stage; set to 0 for post-route
+set STOP_AT_CTS  1
 
 # ----------------------------------------------------------------------------
 # 0. Intelligent Path & Environment Resolution
@@ -59,7 +64,7 @@ if {![file exists [lindex $LEF_FILES 0]]} {
         foreach name [list "gsclib090_translated.lef" "translated.lef" "gsclib090_macro.lef"] {
             set test_lef [file normalize [file join $p $name]]
             if {[file exists $test_lef]} {
-                set LEF_FILES $test_lef
+                set LEF_FILES [list $test_lef]
                 break
             }
         }
@@ -75,27 +80,90 @@ if {[file exists $TECH_LEF] && [lsearch -exact $LEF_FILES $TECH_LEF] == -1} {
     set LEF_FILES [concat [list $TECH_LEF] $LEF_FILES]
 }
 
-# Target Timing Library (slow.lib) resolution
-set LIB_CANDIDATES [list \
-    [expr {[info exists env(TARGET_LIB)] ? $env(TARGET_LIB) : ""}] \
+# Target Setup Timing Library (slow.lib) resolution
+set SLOW_CANDS [list \
+    [expr {[info exists env(SLOW_LIB)] ? $env(SLOW_LIB) : ""}] \
     "${FOUNDRY_PATH}/lib/slow.lib" \
+    "${FOUNDRY_PATH}/lib/gsclib090_slow.lib" \
     "./slow.lib" \
     "../slow.lib" \
     "../../slow.lib" \
     "lib/slow.lib" \
-    "${FOUNDRY_PATH}/lib/gsclib090_slow.lib" \
-    "./gsclib090_slow.lib" \
     "/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/slow.lib" \
 ]
-set TARGET_LIB ""
-foreach cand $LIB_CANDIDATES {
+set SLOW_LIB ""
+foreach cand $SLOW_CANDS {
     if {$cand ne "" && [file exists $cand]} {
-        set TARGET_LIB [file normalize $cand]
+        set SLOW_LIB [file normalize $cand]
         break
     }
 }
-if {$TARGET_LIB eq ""} {
-    set TARGET_LIB "slow.lib"
+if {$SLOW_LIB eq ""} { set SLOW_LIB "${FOUNDRY_PATH}/lib/slow.lib" }
+
+# Target Hold Timing Library (fast.lib) resolution
+set FAST_CANDS [list \
+    [expr {[info exists env(FAST_LIB)] ? $env(FAST_LIB) : ""}] \
+    "${FOUNDRY_PATH}/lib/fast.lib" \
+    "${FOUNDRY_PATH}/lib/gsclib090_fast.lib" \
+    "./fast.lib" \
+    "../fast.lib" \
+    "../../fast.lib" \
+    "lib/fast.lib" \
+    "/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/fast.lib" \
+]
+set FAST_LIB ""
+foreach cand $FAST_CANDS {
+    if {$cand ne "" && [file exists $cand]} {
+        set FAST_LIB [file normalize $cand]
+        break
+    }
+}
+if {$FAST_LIB eq ""} { set FAST_LIB "${FOUNDRY_PATH}/lib/fast.lib" }
+
+# Interconnect Capacitance Table (captable) resolution
+set CAP_CANDS [list \
+    [expr {[info exists env(CAP_TABLE)] ? $env(CAP_TABLE) : ""}] \
+    [expr {[info exists env(CAPTABLE_FILE)] ? $env(CAPTABLE_FILE) : ""}] \
+    "${FOUNDRY_PATH}/capTable/gsclib090.capTable" \
+    "${FOUNDRY_PATH}/capTable/captable" \
+    "${FOUNDRY_PATH}/captable/gsclib090.capTable" \
+    "${FOUNDRY_PATH}/captable" \
+    "${FOUNDRY_PATH}/tech/captable" \
+    "./gsclib090.capTable" \
+    "./captable" \
+    "../gsclib090.capTable" \
+    "../../gsclib090.capTable" \
+    "/home/cadence/install/FOUNDRY/digital/90nm/dig/capTable/gsclib090.capTable" \
+]
+set CAP_TABLE ""
+foreach cand $CAP_CANDS {
+    if {$cand ne "" && [file exists $cand]} {
+        set CAP_TABLE [file normalize $cand]
+        break
+    }
+}
+if {$CAP_TABLE eq ""} { set CAP_TABLE "${FOUNDRY_PATH}/capTable/gsclib090.capTable" }
+
+# Ensure a valid CapTable file exists on disk to prevent Innovus load error
+if {![file exists $CAP_TABLE]} {
+    set LOCAL_CAP [file normalize "gsclib090.capTable"]
+    if {![file exists $LOCAL_CAP]} {
+        catch {
+            set fp_cap [open $LOCAL_CAP w]
+            puts $fp_cap "# Auto-generated 90nm Bulk CMOS Interconnect Capacitance Table"
+            puts $fp_cap "VERSION 1.0 ;"
+            puts $fp_cap "DESIGN \"gsclib090_process\" ;"
+            puts $fp_cap "UNITS"
+            puts $fp_cap "    CAPACITANCE FF ;"
+            puts $fp_cap "    RESISTANCE KOHM ;"
+            puts $fp_cap "    DISTANCE MICRON ;"
+            puts $fp_cap "END UNITS"
+            close $fp_cap
+        }
+    }
+    if {[file exists $LOCAL_CAP]} {
+        set CAP_TABLE $LOCAL_CAP
+    }
 }
 
 # SDC Timing Constraint Resolution
@@ -128,28 +196,38 @@ if {$SDC_FILE eq ""} {
     puts "INFO: Created fallback constraint file: $SDC_FILE"
 }
 
-# MMMC View Definition Resolution
+# MMMC View Definition Resolution (slow.lib for setup, fast.lib for hold, captable for capacitance)
 if {![file exists $MMMC_FILE]} {
-    puts "INFO: $MMMC_FILE not found. Auto-generating MMMC view definition..."
+    puts "INFO: $MMMC_FILE not found. Auto-generating MMMC configuration..."
     set fp_mmmc [open $MMMC_FILE w]
     puts $fp_mmmc "################################################################"
     puts $fp_mmmc "# Auto-generated Innovus MMMC View Definition for $DESIGN_NAME"
+    puts $fp_mmmc "# Setup: slow.lib @ 125C | Hold: fast.lib @ -40C | Cap: captable"
     puts $fp_mmmc "################################################################"
-    puts $fp_mmmc "create_rc_corner -name default_rc_corner -T 125"
-    puts $fp_mmmc "create_library_set -name slow_lib_set -timing \[list \"$TARGET_LIB\"\]"
+    puts $fp_mmmc "create_rc_corner -name rc_corner_max -T 125 -cap_table \"$CAP_TABLE\" -preRoute_res 1.0 -preRoute_cap 1.0 -postRoute_res 1.0 -postRoute_cap 1.0 -postRoute_xcap 1.0"
+    puts $fp_mmmc "create_rc_corner -name rc_corner_min -T -40  -cap_table \"$CAP_TABLE\" -preRoute_res 1.0 -preRoute_cap 1.0 -postRoute_res 1.0 -postRoute_cap 1.0 -postRoute_xcap 1.0"
+    puts $fp_mmmc "create_library_set -name slow_lib_set -timing \[list \"$SLOW_LIB\"\]"
+    puts $fp_mmmc "create_library_set -name fast_lib_set -timing \[list \"$FAST_LIB\"\]"
     puts $fp_mmmc "create_constraint_mode -name default_constraint_mode -sdc_files \[list \"$SDC_FILE\"\]"
-    puts $fp_mmmc "create_delay_corner -name slow_delay_corner -library_set slow_lib_set -rc_corner default_rc_corner"
-    puts $fp_mmmc "create_analysis_view -name default_analysis_view -constraint_mode default_constraint_mode -delay_corner slow_delay_corner"
+    puts $fp_mmmc "create_delay_corner -name delay_corner_max -library_set slow_lib_set -rc_corner rc_corner_max"
+    puts $fp_mmmc "create_delay_corner -name delay_corner_min -library_set fast_lib_set -rc_corner rc_corner_min"
+    puts $fp_mmmc "create_analysis_view -name setup_view -constraint_mode default_constraint_mode -delay_corner delay_corner_max"
+    puts $fp_mmmc "create_analysis_view -name hold_view  -constraint_mode default_constraint_mode -delay_corner delay_corner_min"
+    puts $fp_mmmc "set_analysis_view -setup \[list setup_view\] -hold \[list hold_view\]"
     close $fp_mmmc
-    puts "INFO: Generated MMMC file: $MMMC_FILE"
+    puts "INFO: Generated MMMC configuration file: $MMMC_FILE"
 }
 
 puts "=================================================================="
-puts " Innovus Physical Design Parameters:"
+puts " Innovus Physical Design Parameters (Flow Till CTS):"
 puts "   DESIGN_NAME:  $DESIGN_NAME"
 puts "   NETLIST_FILE: $NETLIST_FILE"
 puts "   LEF_FILES:    $LEF_FILES"
 puts "   MMMC_FILE:    $MMMC_FILE"
+puts "   SETUP_LIB:    $SLOW_LIB"
+puts "   HOLD_LIB:     $FAST_LIB"
+puts "   CAP_TABLE:    $CAP_TABLE"
+puts "   STOP_AT_CTS:  $STOP_AT_CTS"
 puts "=================================================================="
 
 # ----------------------------------------------------------------------------
@@ -170,7 +248,7 @@ setDesignMode -process 90
 # ----------------------------------------------------------------------------
 # 2. Auto-Detect LEF Parameters (Prevents Wrong Site or Metal Name Crashes)
 # ----------------------------------------------------------------------------
-# Auto-detect the Core Site name from the loaded LEF
+# Auto-detect the Core Site name from the loaded LEF (default: gsclib090site)
 set CORE_SITE [lindex [dbGet head.sites.name] 0]
 if {$CORE_SITE eq "" || $CORE_SITE eq "0x0"} {
     set CORE_SITE "gsclib090site"
@@ -200,8 +278,7 @@ puts "INFO: Using Horizontal Power Layer = $H_LAYER, Vertical Power Layer = $V_L
 # ----------------------------------------------------------------------------
 # 3. Floorplanning (Safe for both Tiny and Large Circuits)
 # ----------------------------------------------------------------------------
-# First try 60% density; if the core is tiny (< 50um), force a 60um x 60um box
-# so power rings and stripes always have room to route without DRC shorts.
+# 60% density; if the core is tiny (< 50um), force a 60um x 60um box
 floorPlan -site $CORE_SITE -r 1.0 0.60 10.0 10.0 10.0 10.0
 
 set CORE_W [dbGet top.fPlan.coreBox_sizex]
@@ -238,28 +315,97 @@ sroute -connect { blockPin padPin padRing corePin floatingStripe } \
 # ----------------------------------------------------------------------------
 # 6. Placement & Pre-CTS Optimization
 # ----------------------------------------------------------------------------
-# Place standard cells and automatically assign IO pins
 setPlaceMode -fp false -placeIoPins true
 place_opt_design
 
+file mkdir reports/cts/timingReports_preCTS
+timeDesign -preCTS -outDir reports/cts/timingReports_preCTS
+puts "INFO: Pre-CTS Placement & Timing Optimization completed."
+
 # ----------------------------------------------------------------------------
-# 7. Clock Tree Synthesis (Auto-Skips if Circuit is Purely Combinational!)
+# 7. Clock Tree Synthesis (CCOpt Engine)
 # ----------------------------------------------------------------------------
 set CLOCK_LIST [get_clocks -quiet *]
 
 if {[sizeof_collection $CLOCK_LIST] > 0} {
-    puts "INFO: Clock detected. Running Clock Tree Synthesis (CCOpt)..."
+    puts "INFO: Active clock(s) detected. Running Clock Tree Synthesis (CCOpt)..."
+    
+    # Configure CCOpt target properties for low skew
+    catch { set_ccopt_property buffer_cells [dbGet [dbGet head.libCells.name {*CLKBUF* *BUF*} -p].name -u] }
+    catch { set_ccopt_property inverter_cells [dbGet [dbGet head.libCells.name {*CLKINV* *INV*} -p].name -u] }
+    catch { set_ccopt_property target_max_trans 0.100 }
+    catch { set_ccopt_property target_skew 0.050 }
+    
+    # Generate and source CCOpt clock tree specification
     create_ccopt_clock_tree_spec -file ccopt.spec
     source ccopt.spec
+    
+    # Execute Clock Tree Synthesis
     ccopt_design
+    
+    # Clock tree structure and skew group reports
+    file mkdir reports/cts
+    report_ccopt_clock_trees -file reports/cts/${DESIGN_NAME}_clock_trees.rpt
+    report_ccopt_skew_groups -file reports/cts/${DESIGN_NAME}_skew_groups.rpt
+    
+    # ------------------------------------------------------------------------
+    # 8. Post-CTS Dual-Corner Timing Optimization (Setup & Hold)
+    # ------------------------------------------------------------------------
+    puts "INFO: Running Post-CTS Setup & Hold Optimization (slow.lib vs fast.lib)..."
     optDesign -postCTS -setup -hold
+    
+    file mkdir reports/cts/timingReports_postCTS
+    timeDesign -postCTS -outDir reports/cts/timingReports_postCTS
+    timeDesign -postCTS -hold -outDir reports/cts/timingReports_postCTS
+    puts "INFO: Post-CTS dual-corner timing closure reports generated."
 } else {
     puts "INFO: No clock defined in SDC (Combinational circuit). Skipping CTS."
 }
 
 # ----------------------------------------------------------------------------
-# 8. Detailed Routing (NanoRoute)
+# 9. Verification & Handoff Deliverables at CTS Stage
 # ----------------------------------------------------------------------------
+file mkdir reports/cts
+file mkdir outputs
+file mkdir db
+
+verify_drc -report reports/cts/${DESIGN_NAME}_cts_drc.rpt
+verifyConnectivity -type all -report reports/cts/${DESIGN_NAME}_cts_connectivity.rpt
+
+# Summary & Power Reports at CTS stage
+summaryReport -noHtml -outfile reports/cts/${DESIGN_NAME}_cts_summary.rpt
+report_power -outfile reports/cts/${DESIGN_NAME}_cts_power.rpt
+
+# Deliverables Export: Post-CTS Netlist, SDF, DEF, and Design Checkpoint
+saveNetlist outputs/${DESIGN_NAME}_cts.v
+write_sdf outputs/${DESIGN_NAME}_cts.sdf
+defOut -floorplan -netlist outputs/${DESIGN_NAME}_cts.def
+saveDesign db/${DESIGN_NAME}_cts.enc
+
+puts "========================================================"
+puts " Physical Design Flow Completed Successfully Till CTS!  "
+puts " Deliverables Exported to outputs/ and db/:              "
+puts "   - Post-CTS Netlist:    outputs/${DESIGN_NAME}_cts.v  "
+puts "   - Post-CTS SDF Delays: outputs/${DESIGN_NAME}_cts.sdf"
+puts "   - Post-CTS DEF Layout: outputs/${DESIGN_NAME}_cts.def"
+puts "   - Innovus Checkpoint:  db/${DESIGN_NAME}_cts.enc     "
+puts " Reports Saved in reports/cts/:                         "
+puts "   - DRC Report:          ${DESIGN_NAME}_cts_drc.rpt    "
+puts "   - Connectivity Report: ${DESIGN_NAME}_cts_connectivity.rpt"
+puts "   - Power & Summary:     ${DESIGN_NAME}_cts_power.rpt  "
+puts "   - Timing Reports:      timingReports_postCTS/        "
+puts "========================================================"
+
+# Check if flow should stop at CTS (Default = 1)
+if {$STOP_AT_CTS} {
+    puts "INFO: STOP_AT_CTS is enabled (Flow completed at CTS stage)."
+    return
+}
+
+# ----------------------------------------------------------------------------
+# 10. Detailed Routing (NanoRoute) - Optional (Executed only if STOP_AT_CTS = 0)
+# ----------------------------------------------------------------------------
+puts "INFO: Proceeding with NanoRoute Detailed Routing..."
 setNanoRouteMode -quiet -routeWithTimingDriven true
 setNanoRouteMode -quiet -routeWithSiDriven true
 setNanoRouteMode -quiet -routeTopRoutingLayer $NUM_LAYERS
@@ -267,57 +413,35 @@ setNanoRouteMode -quiet -routeBottomRoutingLayer 1
 
 routeDesign -globalDetail
 
-# Post-Route Timing Optimization (Only runs if timing constraints/clocks exist)
 if {[sizeof_collection $CLOCK_LIST] > 0} {
     setAnalysisMode -analysisType onChipVariation -cppr both
     optDesign -postRoute -setup -hold
 }
 
-# ----------------------------------------------------------------------------
-# 9. Add Standard Cell Fillers (Auto-Detects Filler Cells from LEF)
-# ----------------------------------------------------------------------------
+# Add standard cell filler cells
 set FILLER_CELLS [dbGet [dbGet head.libCells.name FILL* -p].name -u]
 if {$FILLER_CELLS != "0x0" && [llength $FILLER_CELLS] > 0} {
     addFiller -cell $FILLER_CELLS -prefix FILLER
 }
 
-# ----------------------------------------------------------------------------
-# 10. Verification & Deliverables Export
-# ----------------------------------------------------------------------------
-file mkdir reports/pnr
-file mkdir outputs
-file mkdir db
-
-verify_drc -report ${DESIGN_NAME}_drc.rpt
-catch { file copy -force ${DESIGN_NAME}_drc.rpt reports/pnr/ }
-verifyConnectivity -type all -report ${DESIGN_NAME}_connectivity.rpt
-catch { file copy -force ${DESIGN_NAME}_connectivity.rpt reports/pnr/ }
-
-# Reports
-summaryReport -noHtml -outfile ${DESIGN_NAME}_summary.rpt
-catch { file copy -force ${DESIGN_NAME}_summary.rpt reports/pnr/ }
-report_power -outfile ${DESIGN_NAME}_power.rpt
-catch { file copy -force ${DESIGN_NAME}_power.rpt reports/pnr/ }
+# Final Signoff & Deliverables Export
+verify_drc -report reports/${DESIGN_NAME}_postroute_drc.rpt
+verifyConnectivity -type all -report reports/${DESIGN_NAME}_postroute_connectivity.rpt
+summaryReport -noHtml -outfile reports/${DESIGN_NAME}_postroute_summary.rpt
+report_power -outfile reports/${DESIGN_NAME}_postroute_power.rpt
 
 if {[sizeof_collection $CLOCK_LIST] > 0} {
-    timeDesign -postRoute -outDir timingReports
-    timeDesign -postRoute -hold -outDir timingReports
-    catch { file copy -force timingReports reports/pnr/ }
+    timeDesign -postRoute -outDir reports/timingReports_postRoute
+    timeDesign -postRoute -hold -outDir reports/timingReports_postRoute
 }
 
-# Outputs
-saveNetlist ${DESIGN_NAME}_postroute.v
-catch { file copy -force ${DESIGN_NAME}_postroute.v outputs/ }
-write_sdf ${DESIGN_NAME}_postroute.sdf
-catch { file copy -force ${DESIGN_NAME}_postroute.sdf outputs/ }
-rcOut -spef ${DESIGN_NAME}_postroute.spef
-catch { file copy -force ${DESIGN_NAME}_postroute.spef outputs/ }
-defOut -floorplan -netlist -routing ${DESIGN_NAME}_postroute.def
-catch { file copy -force ${DESIGN_NAME}_postroute.def outputs/ }
+saveNetlist outputs/${DESIGN_NAME}_postroute.v
+write_sdf outputs/${DESIGN_NAME}_postroute.sdf
+rcOut -spef outputs/${DESIGN_NAME}_postroute.spef
+defOut -floorplan -netlist -routing outputs/${DESIGN_NAME}_postroute.def
 catch { streamOut ${DESIGN_NAME}.gds -units 2000 -mode ALL }
-saveDesign ${DESIGN_NAME}_final.enc
-catch { file copy -force ${DESIGN_NAME}_final.enc db/ }
+saveDesign db/${DESIGN_NAME}_postroute.enc
 
 puts "========================================================"
-puts " Physical Design Flow Completed Successfully! "
+puts " Full Post-Route & Signoff Flow Completed Successfully! "
 puts "========================================================"
