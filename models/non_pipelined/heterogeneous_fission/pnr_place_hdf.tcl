@@ -5,6 +5,7 @@
 # Design: hdf_top (Model 3: Heterogeneous Spatial Fission / PolyFlow-NPU (Non-Pipelined))
 # MMMC: slow.lib (Setup), fast.lib (Hold), CapTable (Capacitance)
 # Flow Scope: Full Flow Till Clock Tree Synthesis (CTS) & Post-CTS Optimization
+# Checkpoints: Saves .enc checkpoints between each major physical design phase
 # ============================================================================
 
 # ---> ONLY EDIT THESE 4 PATHS/NAMES <---
@@ -23,6 +24,11 @@ set MULTI_CPU [expr {[info exists env(PNR_CPUS)] ? $env(PNR_CPUS) : 4}]
 catch { setMultiCpuUsage -localCpu $MULTI_CPU -keepLicense true }
 
 set FOUNDRY_PATH [expr {[info exists env(FOUNDRY_PATH)] ? $env(FOUNDRY_PATH) : "/home/cadence/install/FOUNDRY/digital/90nm/dig"}]
+
+# Output directories
+file mkdir db
+file mkdir outputs
+file mkdir reports/cts
 
 # Netlist resolution: verify or search in candidate paths
 if {![file exists $NETLIST_FILE]} {
@@ -231,7 +237,7 @@ puts "   STOP_AT_CTS:  $STOP_AT_CTS"
 puts "=================================================================="
 
 # ----------------------------------------------------------------------------
-# 1. Design Import
+# 1. Design Import & Mode Setup
 # ----------------------------------------------------------------------------
 set init_design_uniquify 1
 set init_verilog $NETLIST_FILE
@@ -244,6 +250,10 @@ set init_mmmc_file $MMMC_FILE
 
 init_design
 setDesignMode -process 90
+
+# Checkpoint 1: Design Import
+saveDesign db/${DESIGN_NAME}_01_init.enc
+puts "INFO: [CHECKPOINT 1/5] Design import saved to db/${DESIGN_NAME}_01_init.enc"
 
 # ----------------------------------------------------------------------------
 # 2. Auto-Detect LEF Parameters (Prevents Wrong Site or Metal Name Crashes)
@@ -276,7 +286,7 @@ if {[dbGet [dbGet head.layers.name $TOP_LAYER -p].direction] == "Horizontal"} {
 puts "INFO: Using Horizontal Power Layer = $H_LAYER, Vertical Power Layer = $V_LAYER"
 
 # ----------------------------------------------------------------------------
-# 3. Floorplanning (Safe for both Tiny and Large Circuits)
+# 3. Floorplanning & Power Network Design (PDN)
 # ----------------------------------------------------------------------------
 # 60% density; if the core is tiny (< 50um), force a 60um x 60um box
 floorPlan -site $CORE_SITE -r 1.0 0.60 10.0 10.0 10.0 10.0
@@ -288,18 +298,14 @@ if {$CORE_W < 50.0} {
 }
 fit
 
-# ----------------------------------------------------------------------------
-# 4. Global Net Connections (VDD / VSS)
-# ----------------------------------------------------------------------------
+# Global Net Connections (VDD / VSS)
 clearGlobalNets
 globalNetConnect VDD -type pgpin -pin VDD -inst *
 globalNetConnect VSS -type pgpin -pin VSS -inst *
 globalNetConnect VDD -type tiehi -inst *
 globalNetConnect VSS -type tielo -inst *
 
-# ----------------------------------------------------------------------------
-# 5. Power Ring, Stripes, and Special Route (sroute)
-# ----------------------------------------------------------------------------
+# Power Ring, Stripes, and Special Route (sroute)
 addRing -nets {VDD VSS} -type core_rings -follow core \
     -layer [list top $H_LAYER bottom $H_LAYER left $V_LAYER right $V_LAYER] \
     -width 1.5 -spacing 0.8 -offset 1.5
@@ -312,8 +318,12 @@ sroute -connect { blockPin padPin padRing corePin floatingStripe } \
     -nets { VDD VSS } \
     -layerChangeRange [list ${BOT_LAYER}(1) ${TOP_LAYER}($NUM_LAYERS)]
 
+# Checkpoint 2: Floorplan & Power Grid
+saveDesign db/${DESIGN_NAME}_02_power.enc
+puts "INFO: [CHECKPOINT 2/5] Floorplan & Power grid saved to db/${DESIGN_NAME}_02_power.enc"
+
 # ----------------------------------------------------------------------------
-# 6. Placement & Pre-CTS Optimization
+# 4. Standard Cell Placement & Pre-CTS Optimization
 # ----------------------------------------------------------------------------
 setPlaceMode -fp false -placeIoPins true
 place_opt_design
@@ -322,8 +332,12 @@ file mkdir reports/cts/timingReports_preCTS
 timeDesign -preCTS -outDir reports/cts/timingReports_preCTS
 puts "INFO: Pre-CTS Placement & Timing Optimization completed."
 
+# Checkpoint 3: Placement & Pre-CTS
+saveDesign db/${DESIGN_NAME}_03_placed.enc
+puts "INFO: [CHECKPOINT 3/5] Placement & Pre-CTS saved to db/${DESIGN_NAME}_03_placed.enc"
+
 # ----------------------------------------------------------------------------
-# 7. Clock Tree Synthesis (CCOpt Engine)
+# 5. Clock Tree Synthesis (CCOpt Engine)
 # ----------------------------------------------------------------------------
 set CLOCK_LIST [get_clocks -quiet *]
 
@@ -344,12 +358,15 @@ if {[sizeof_collection $CLOCK_LIST] > 0} {
     ccopt_design
     
     # Clock tree structure and skew group reports
-    file mkdir reports/cts
     report_ccopt_clock_trees -file reports/cts/${DESIGN_NAME}_clock_trees.rpt
     report_ccopt_skew_groups -file reports/cts/${DESIGN_NAME}_skew_groups.rpt
     
+    # Checkpoint 4: Clock Tree Synthesized
+    saveDesign db/${DESIGN_NAME}_04_cts.enc
+    puts "INFO: [CHECKPOINT 4/5] Clock Tree Synthesis saved to db/${DESIGN_NAME}_04_cts.enc"
+    
     # ------------------------------------------------------------------------
-    # 8. Post-CTS Dual-Corner Timing Optimization (Setup & Hold)
+    # 6. Post-CTS Dual-Corner Timing Optimization (Setup & Hold)
     # ------------------------------------------------------------------------
     puts "INFO: Running Post-CTS Setup & Hold Optimization (slow.lib vs fast.lib)..."
     optDesign -postCTS -setup -hold
@@ -363,12 +380,8 @@ if {[sizeof_collection $CLOCK_LIST] > 0} {
 }
 
 # ----------------------------------------------------------------------------
-# 9. Verification & Handoff Deliverables at CTS Stage
+# 7. Verification & Handoff Deliverables at CTS Stage
 # ----------------------------------------------------------------------------
-file mkdir reports/cts
-file mkdir outputs
-file mkdir db
-
 verify_drc -report reports/cts/${DESIGN_NAME}_cts_drc.rpt
 verifyConnectivity -type all -report reports/cts/${DESIGN_NAME}_cts_connectivity.rpt
 
@@ -376,34 +389,43 @@ verifyConnectivity -type all -report reports/cts/${DESIGN_NAME}_cts_connectivity
 summaryReport -noHtml -outfile reports/cts/${DESIGN_NAME}_cts_summary.rpt
 report_power -outfile reports/cts/${DESIGN_NAME}_cts_power.rpt
 
-# Deliverables Export: Post-CTS Netlist, SDF, DEF, and Design Checkpoint
+# Deliverables Export: Post-CTS Netlist, SDF, DEF
 saveNetlist outputs/${DESIGN_NAME}_cts.v
 write_sdf outputs/${DESIGN_NAME}_cts.sdf
 defOut -floorplan -netlist outputs/${DESIGN_NAME}_cts.def
+
+# Checkpoint 5: Post-CTS Closed Design & Handoff Checkpoint
+saveDesign db/${DESIGN_NAME}_05_postcts.enc
 saveDesign db/${DESIGN_NAME}_cts.enc
+puts "INFO: [CHECKPOINT 5/5] Post-CTS closed design saved to db/${DESIGN_NAME}_05_postcts.enc and db/${DESIGN_NAME}_cts.enc"
 
 puts "========================================================"
 puts " Physical Design Flow Completed Successfully Till CTS!  "
-puts " Deliverables Exported to outputs/ and db/:              "
-puts "   - Post-CTS Netlist:    outputs/${DESIGN_NAME}_cts.v  "
-puts "   - Post-CTS SDF Delays: outputs/${DESIGN_NAME}_cts.sdf"
-puts "   - Post-CTS DEF Layout: outputs/${DESIGN_NAME}_cts.def"
-puts "   - Innovus Checkpoint:  db/${DESIGN_NAME}_cts.enc     "
+puts " Database Checkpoints Saved in db/:                     "
+puts "   [1] db/${DESIGN_NAME}_01_init.enc     (Design Import)"
+puts "   [2] db/${DESIGN_NAME}_02_power.enc    (Floorplan/PDN)"
+puts "   [3] db/${DESIGN_NAME}_03_placed.enc   (Placement/Opt)"
+puts "   [4] db/${DESIGN_NAME}_04_cts.enc      (Clock Tree)   "
+puts "   [5] db/${DESIGN_NAME}_05_postcts.enc  (Post-CTS Opt) "
+puts " Deliverables Exported in outputs/:                     "
+puts "   - Netlist:    outputs/${DESIGN_NAME}_cts.v           "
+puts "   - SDF Delays: outputs/${DESIGN_NAME}_cts.sdf         "
+puts "   - DEF Layout: outputs/${DESIGN_NAME}_cts.def         "
 puts " Reports Saved in reports/cts/:                         "
 puts "   - DRC Report:          ${DESIGN_NAME}_cts_drc.rpt    "
 puts "   - Connectivity Report: ${DESIGN_NAME}_cts_connectivity.rpt"
-puts "   - Power & Summary:     ${DESIGN_NAME}_cts_power.rpt  "
+puts "   - Power Report:        ${DESIGN_NAME}_cts_power.rpt  "
 puts "   - Timing Reports:      timingReports_postCTS/        "
 puts "========================================================"
 
 # Check if flow should stop at CTS (Default = 1)
 if {$STOP_AT_CTS} {
-    puts "INFO: STOP_AT_CTS is enabled (Flow completed at CTS stage)."
+    puts "INFO: STOP_AT_CTS is enabled (Flow completed cleanly at CTS stage)."
     return
 }
 
 # ----------------------------------------------------------------------------
-# 10. Detailed Routing (NanoRoute) - Optional (Executed only if STOP_AT_CTS = 0)
+# 8. Detailed Routing (NanoRoute) - Optional (Executed only if STOP_AT_CTS = 0)
 # ----------------------------------------------------------------------------
 puts "INFO: Proceeding with NanoRoute Detailed Routing..."
 setNanoRouteMode -quiet -routeWithTimingDriven true
@@ -440,8 +462,12 @@ write_sdf outputs/${DESIGN_NAME}_postroute.sdf
 rcOut -spef outputs/${DESIGN_NAME}_postroute.spef
 defOut -floorplan -netlist -routing outputs/${DESIGN_NAME}_postroute.def
 catch { streamOut ${DESIGN_NAME}.gds -units 2000 -mode ALL }
-saveDesign db/${DESIGN_NAME}_postroute.enc
+
+# Final Checkpoint: Post-Route Signoff
+saveDesign db/${DESIGN_NAME}_06_postroute.enc
+saveDesign db/${DESIGN_NAME}_final.enc
 
 puts "========================================================"
 puts " Full Post-Route & Signoff Flow Completed Successfully! "
+puts " Checkpoint: db/${DESIGN_NAME}_06_postroute.enc         "
 puts "========================================================"
