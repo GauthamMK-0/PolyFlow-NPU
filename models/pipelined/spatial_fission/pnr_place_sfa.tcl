@@ -173,7 +173,7 @@ setDesignMode -process 90
 # Auto-detect the Core Site name from the loaded LEF
 set CORE_SITE [lindex [dbGet head.sites.name] 0]
 if {$CORE_SITE eq "" || $CORE_SITE eq "0x0"} {
-    set CORE_SITE "CoreSite"
+    set CORE_SITE "gsclib090site"
 }
 puts "INFO: Auto-detected LEF Core Site = $CORE_SITE"
 
