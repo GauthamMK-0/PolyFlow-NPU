@@ -2,14 +2,18 @@ if {![namespace exists ::IMEX]} { namespace eval ::IMEX {} }
 set ::IMEX::dataVar [file dirname [file normalize [info script]]]
 set ::IMEX::libVar ${::IMEX::dataVar}/libs
 
+set _min_lib [expr {[file exists "${::IMEX::libVar}/mmmc/fast.lib"] ? "${::IMEX::libVar}/mmmc/fast.lib" : "/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/fast.lib"}]
+set _max_lib [expr {[file exists "${::IMEX::libVar}/mmmc/slow.lib"] ? "${::IMEX::libVar}/mmmc/slow.lib" : "/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/slow.lib"}]
+set _captbl  [expr {[file exists "${::IMEX::libVar}/mmmc/gpdk090.lef.extended.CapTbl"] ? "${::IMEX::libVar}/mmmc/gpdk090.lef.extended.CapTbl" : "/home/cadence/install/FOUNDRY/digital/90nm/dig/captable/gpdk090.lef.extended.CapTbl"}]
+
 create_library_set -name MIN\
    -timing\
-    [list ${::IMEX::libVar}/mmmc/fast.lib]
+    [list $_min_lib]
 create_library_set -name MAX\
    -timing\
-    [list ${::IMEX::libVar}/mmmc/slow.lib]
+    [list $_max_lib]
 create_rc_corner -name CAP\
-   -cap_table ${::IMEX::libVar}/mmmc/gpdk090.lef.extended.CapTbl\
+   -cap_table $_captbl\
    -preRoute_res 1\
    -postRoute_res 1\
    -preRoute_cap 1\

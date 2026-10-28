@@ -19,7 +19,7 @@ set distributed_mmmc_disable_reports_auto_redirection {0}
 set enable_ilm_dual_view_gui_and_attribute 1
 set enc_enable_print_mode_command_reset_options 1
 set init_gnd_net {VSS}
-set init_lef_file {../../../../../../../../cadence/install/FOUNDRY/digital/90nm/dig/lef/gsclib090_translated.lef}
+set init_lef_file {/home/cadence/install/FOUNDRY/digital/90nm/dig/lef/gsclib090_translated.lef}
 set init_mmmc_file {HDFF.view}
 set init_pwr_net {VDD}
 set init_verilog {hdf_top_netlist.v}

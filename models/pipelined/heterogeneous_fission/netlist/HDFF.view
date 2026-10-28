@@ -1,8 +1,8 @@
 # Version:1.0 MMMC View Definition File
 # Do Not Remove Above Line
-create_rc_corner -name CAP -cap_table {../../../../../../../../cadence/install/FOUNDRY/digital/90nm/dig/captable/gpdk090.lef.extended.CapTbl} -preRoute_res {1.0} -preRoute_cap {1.0} -preRoute_clkres {0.0} -preRoute_clkcap {0.0} -postRoute_res {1.0} -postRoute_cap {1.0} -postRoute_xcap {1.0} -postRoute_clkres {0.0} -postRoute_clkcap {0.0}
-create_library_set -name MAX -timing {../../../../../../../../cadence/install/FOUNDRY/digital/90nm/dig/lib/slow.lib}
-create_library_set -name MIN -timing {../../../../../../../../cadence/install/FOUNDRY/digital/90nm/dig/lib/fast.lib}
+create_rc_corner -name CAP -cap_table {/home/cadence/install/FOUNDRY/digital/90nm/dig/captable/gpdk090.lef.extended.CapTbl} -preRoute_res {1.0} -preRoute_cap {1.0} -preRoute_clkres {0.0} -preRoute_clkcap {0.0} -postRoute_res {1.0} -postRoute_cap {1.0} -postRoute_xcap {1.0} -postRoute_clkres {0.0} -postRoute_clkcap {0.0}
+create_library_set -name MAX -timing {/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/slow.lib}
+create_library_set -name MIN -timing {/home/cadence/install/FOUNDRY/digital/90nm/dig/lib/fast.lib}
 create_constraint_mode -name SDC -sdc_files {hdf_top_netlist.sdc}
 create_delay_corner -name SET_MAX -library_set {MAX} -rc_corner {CAP}
 create_delay_corner -name HOD_MIN -library_set {MIN} -rc_corner {CAP}
