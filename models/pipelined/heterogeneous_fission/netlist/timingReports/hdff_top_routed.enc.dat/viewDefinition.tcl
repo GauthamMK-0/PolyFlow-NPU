@@ -1,11 +1,11 @@
 create_library_set -name MIN\
    -timing\
-    [list ../../../../../../../../cadence/install/FOUNDRY/digital/90nm/dig/lib/fast.lib]
+    [list /home/cadence/install/FOUNDRY/digital/90nm/dig/lib/fast.lib]
 create_library_set -name MAX\
    -timing\
-    [list ../../../../../../../../cadence/install/FOUNDRY/digital/90nm/dig/lib/slow.lib]
+    [list /home/cadence/install/FOUNDRY/digital/90nm/dig/lib/slow.lib]
 create_rc_corner -name CAP\
-   -cap_table ../../../../../../../../cadence/install/FOUNDRY/digital/90nm/dig/captable/gpdk090.lef.extended.CapTbl\
+   -cap_table /home/cadence/install/FOUNDRY/digital/90nm/dig/captable/gpdk090.lef.extended.CapTbl\
    -preRoute_res 1\
    -postRoute_res 1\
    -preRoute_cap 1\
