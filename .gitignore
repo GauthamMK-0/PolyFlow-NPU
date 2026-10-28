@@ -6,7 +6,12 @@
 *.info
 obj_dir/
 # Cadence simulation & synthesis artifacts
-output/
+output/*
+!output/
+!output/**/
+!output/*.v
+!output/*.vg
+!output/*netlist*
 xcelium.d/
 waves.shm/
 .simvision/
@@ -14,6 +19,7 @@ xrun.history
 fv/
 genus.cmd*
 genus.log*
+innovus.cmd*
 
 *.o
 *.d
@@ -33,9 +39,30 @@ local/
 *.aux
 *.out
 
-# Ensure gate-level netlists, SDC, and SDF files are tracked in git
+# Ensure gate-level and PnR netlists, SDC, and SDF files are tracked in git
 !**/netlist/
 !**/netlist/**
+!*netlist*
+!**/*netlist*
+!*.vg
+!**/*.vg
 !*_netlist.*
+!**/*_netlist.*
+!*_cts.v
+!**/*_cts.v
+!*_postroute.v
+!**/*_postroute.v
+!*_placed.v
+!**/*_placed.v
+!*_route.v
+!**/*_route.v
+!*_pnr.v
+!**/*_pnr.v
+!**/outputs/*.v
+!**/outputs/*.vg
 !*.sdc
 !*.sdf
+
+# Track Innovus log files alone (unignore from *.log)
+!*innovus*.log*
+!**/*innovus*.log*
