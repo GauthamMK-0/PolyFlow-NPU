@@ -184,8 +184,6 @@ saveDesign db/${DESIGN_NAME}_02_power.enc
 # 4. Pre-Place Timing, Standard Cell Placement & Pre-CTS Optimization
 # ----------------------------------------------------------------------------
 timeDesign -prePlace -setup
-optDesign -prePlace -setup
-optDesign -prePlace
 
 setPlaceMode -fp false
 place_design
@@ -260,7 +258,7 @@ if {$STOP_AT_CTS} {
 }
 
 # ----------------------------------------------------------------------------
-# 7. Detailed Routing (NanoRoute), Filler Insertion & Post-Route Optimization
+# 7. Detailed Routing (NanoRoute), Post-Route Optimization & Filler Insertion
 # ----------------------------------------------------------------------------
 setNanoRouteMode -quiet -routeTopRoutingLayer 9
 setNanoRouteMode -quiet -routeBottomRoutingLayer 1
@@ -269,14 +267,13 @@ setNanoRouteMode -quiet -routeWithTimingDriven false
 setNanoRouteMode -quiet -routeWithSiDriven false
 routeDesign -globalDetail
 
-# Add Standard Cell Fillers (FILL1, FILL2, FILL4, FILL8, FILL16)
-addFiller -cell FILL1 FILL2 FILL4 FILL8 FILL16 -prefix FILLER
-
 # Post-Route OCV & CPPR Timing Analysis and Optimization
-timeDesign -postRoute -setup -hold
 setAnalysisMode -analysisType onChipVariation -cppr both
 timeDesign -postRoute -setup -hold
 optDesign -postRoute -setup -hold
+
+# Add Standard Cell Fillers (FILL1, FILL2, FILL4, FILL8, FILL16)
+addFiller -cell FILL1 FILL2 FILL4 FILL8 FILL16 -prefix FILLER
 
 # ----------------------------------------------------------------------------
 # 8. Final Signoff Deliverables & Reports
