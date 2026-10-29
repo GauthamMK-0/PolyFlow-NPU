@@ -59,7 +59,6 @@ report_power   > reports/power_hdf.rpt
 report_area    > reports/area_hdf.rpt
 report_qor     > reports/qor_hdf.rpt
 report_gates   > reports/gates_hdf.rpt
-catch { report_summary > reports/summary_hdf.rpt }
 
 # --- Netlist & Gate-Level Files Generation ---
 file mkdir netlist
@@ -72,6 +71,7 @@ puts " \[SYNTHESIS EXECUTIVE SUMMARY: hdf_top @ 200 MHz\]"
 puts "=================================================================="
 report_qor
 report_area
+report_timing
 puts "=================================================================="
 puts " Genus Synthesis Finished Successfully! Check reports/ and netlist/ for details."
 puts "=================================================================="

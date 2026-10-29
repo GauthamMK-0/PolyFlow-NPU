@@ -59,7 +59,6 @@ report_power   > reports/power_sfa.rpt
 report_area    > reports/area_sfa.rpt
 report_qor     > reports/qor_sfa.rpt
 report_gates   > reports/gates_sfa.rpt
-catch { report_summary > reports/summary_sfa.rpt }
 
 # --- Netlist & Gate-Level Files Generation ---
 file mkdir netlist
@@ -72,6 +71,7 @@ puts " \[SYNTHESIS EXECUTIVE SUMMARY: sfa_top @ 200 MHz\]"
 puts "=================================================================="
 report_qor
 report_area
+report_timing
 puts "=================================================================="
 puts " Genus Synthesis Finished Successfully! Check reports/ and netlist/ for details."
 puts "=================================================================="

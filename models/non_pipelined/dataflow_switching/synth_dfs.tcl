@@ -51,7 +51,6 @@ report_power   > reports/power_dfs.rpt
 report_area    > reports/area_dfs.rpt
 report_qor     > reports/qor_dfs.rpt
 report_gates   > reports/gates_dfs.rpt
-catch { report_summary > reports/summary_dfs.rpt }
 
 # --- Netlist & Gate-Level Files Generation ---
 file mkdir netlist
@@ -64,6 +63,7 @@ puts " \[SYNTHESIS EXECUTIVE SUMMARY: dfs_top @ 200 MHz\]"
 puts "=================================================================="
 report_qor
 report_area
+report_timing
 puts "=================================================================="
 puts " Genus Synthesis Finished Successfully! Check reports/ and netlist/ for details."
 puts "=================================================================="
