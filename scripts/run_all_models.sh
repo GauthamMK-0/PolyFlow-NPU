@@ -9,10 +9,11 @@ cd "$ROOT_DIR"
 
 SIM_TOOL="${1:-verilator}"      # verilator | iverilog | xrun | cadence
 VARIANT="${2:-all}"            # all | pipelined | non_pipelined
+SCALE="${3:-4x4}"              # 4x4 | 8x8 | 16x16 | all
 
 echo "=================================================================="
-echo " [PolyFlow-NPU] Running Complete Architectural Exploration Testsuite"
-echo " Simulation Tool: $SIM_TOOL | Variant: $VARIANT"
+echo " [PolyFlow-NPU] Running Architectural Exploration Testsuite"
+echo " Simulation Tool: $SIM_TOOL | Variant: $VARIANT | Scale: $SCALE"
 echo "=================================================================="
 
 declare -a SUMMARY_ROWS=()
@@ -27,11 +28,47 @@ run_model_suite() {
     echo " >>> Running Suite: $label ($base_dir) <<<"
     echo "=================================================================="
 
-    local -a models=(
-        "dataflow_switching:dfs_top_tb:Dataflow Switching"
-        "spatial_fission:sfa_top_tb:Spatial Fission"
-        "heterogeneous_fission:hdf_top_tb:PolyFlow-NPU (HDF)"
-    )
+    local -a models=()
+    if [ "$label" = "PIPELINED" ]; then
+        if [ "$SCALE" = "4x4" ]; then
+            models+=(
+                "dataflow_switching:dfs_top_tb:Dataflow Switching (4x4)"
+                "spatial_fission:sfa_top_tb:Spatial Fission (4x4)"
+                "heterogeneous_fission:hdf_top_tb:PolyFlow-NPU HDF (4x4)"
+            )
+        elif [ "$SCALE" = "8x8" ]; then
+            models+=(
+                "dataflow_switching:dfs_top_8x8_tb:Dataflow Switching (8x8)"
+                "spatial_fission:sfa_top_8x8_tb:Spatial Fission (8x8)"
+                "heterogeneous_fission:hdf_top_8x8_tb:PolyFlow-NPU HDF (8x8)"
+            )
+        elif [ "$SCALE" = "16x16" ]; then
+            models+=(
+                "dataflow_switching:dfs_top_16x16_tb:Dataflow Switching (16x16)"
+                "spatial_fission:sfa_top_16x16_tb:Spatial Fission (16x16)"
+                "heterogeneous_fission:hdf_top_16x16_tb:PolyFlow-NPU HDF (16x16)"
+            )
+        elif [ "$SCALE" = "all" ]; then
+            models+=(
+                "dataflow_switching:dfs_top_tb:Dataflow Switching (4x4)"
+                "dataflow_switching:dfs_top_8x8_tb:Dataflow Switching (8x8)"
+                "dataflow_switching:dfs_top_16x16_tb:Dataflow Switching (16x16)"
+                "spatial_fission:sfa_top_tb:Spatial Fission (4x4)"
+                "spatial_fission:sfa_top_8x8_tb:Spatial Fission (8x8)"
+                "spatial_fission:sfa_top_16x16_tb:Spatial Fission (16x16)"
+                "heterogeneous_fission:hdf_top_tb:PolyFlow-NPU HDF (4x4)"
+                "heterogeneous_fission:hdf_top_8x8_tb:PolyFlow-NPU HDF (8x8)"
+                "heterogeneous_fission:hdf_top_16x16_tb:PolyFlow-NPU HDF (16x16)"
+            )
+        fi
+    else
+        # Non-pipelined baseline (4x4 only)
+        models+=(
+            "dataflow_switching:dfs_top_tb:Dataflow Switching (4x4)"
+            "spatial_fission:sfa_top_tb:Spatial Fission (4x4)"
+            "heterogeneous_fission:hdf_top_tb:PolyFlow-NPU HDF (4x4)"
+        )
+    fi
 
     for entry in "${models[@]}"; do
         IFS=":" read -r model_dir tb_module short_name <<< "$entry"
