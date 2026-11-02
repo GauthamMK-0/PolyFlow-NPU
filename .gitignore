@@ -17,9 +17,12 @@ waves.shm/
 .simvision/
 xrun.history
 fv/
-genus.cmd*
-genus.log*
-innovus.cmd*
+genus*.cmd*
+genus*.log*
+innovus*.cmd*
+innovus*.log*
+flex*.log
+pvsUI*.log
 
 *.o
 *.d
@@ -27,6 +30,7 @@ innovus.cmd*
 dump.vcd
 tb/dumps/
 scratch/
+a.out
 
 # Local reference and working files
 local/
@@ -62,7 +66,3 @@ local/
 !**/outputs/*.vg
 !*.sdc
 !*.sdf
-
-# Track Innovus log files alone (unignore from *.log)
-!*innovus*.log*
-!**/*innovus*.log*
