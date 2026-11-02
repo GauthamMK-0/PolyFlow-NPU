@@ -116,3 +116,4 @@ module hdf_top_8x8 #(
     );
 
 endmodule
+

@@ -108,3 +108,4 @@ module sfa_top_8x8 #(
     );
 
 endmodule
+
