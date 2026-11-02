@@ -11,13 +11,14 @@ module sfa_top #(
     parameter int NUM_BANKS   = 2,
     parameter int NUM_REGIONS = 2,
     parameter int REGION_W    = 1,
-    parameter int BW_W        = 8
+    parameter int BW_W        = 8,
+    parameter int SPLIT_W     = ($clog2(NUM_COLS + 1) >= 4) ? $clog2(NUM_COLS + 1) : 4
 ) (
     input  logic                                clk,
     input  logic                                rst_n,
 
     // Dispatch-Time Spatial Fission Configuration
-    input  logic [3:0]                          cfg_split_col,
+    input  logic [SPLIT_W-1:0]                  cfg_split_col,
     input  logic                                cfg_update_strobe,
 
     // Phase tags & arbitration inputs
@@ -69,7 +70,8 @@ module sfa_top #(
 
     // Fission Decoder
     sfa_fission_decoder #(
-        .NUM_COLS(NUM_COLS)
+        .NUM_COLS(NUM_COLS),
+        .SPLIT_W (SPLIT_W)
     ) u_fission_dec (
         .clk                (clk),
         .rst_n              (rst_n),
@@ -140,15 +142,20 @@ module sfa_top #(
         assign bank_role_tag_bus[b*2 +: 2]                    = role_tag_wire;
     end
 
-    // Broadcast clear signals to PEs based on region
+    // Multi-bank clear routing:
+    // Any bank that completes scrubbing asserts clear for its assigned region owner.
+    logic [NUM_REGIONS-1:0] region_bank_clear;
     always_comb begin
-        for (int c = 0; c < NUM_COLS; c++) begin
-            if (region_id_mask[c]) begin
-                pe_bank_role_clear[c] = bank_role_clear_bus[1];
-            end else begin
-                pe_bank_role_clear[c] = bank_role_clear_bus[0];
+        region_bank_clear = '0;
+        for (int b = 0; b < NUM_BANKS; b++) begin
+            if (bank_role_clear_bus[b]) begin
+                region_bank_clear[bank_owner_bus[b*REGION_W +: REGION_W]] = 1'b1;
             end
         end
+    end
+
+    for (genvar c = 0; c < NUM_COLS; c++) begin : gen_pe_clear
+        assign pe_bank_role_clear[c] = region_bank_clear[region_id_mask[c]];
     end
 
     // 2D Systolic Array Grid with Boundary Isolation

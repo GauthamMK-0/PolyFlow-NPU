@@ -36,7 +36,8 @@ XRUN_FLAGS ?= -64bit \
 # Targets
 # ==============================================================================
 .PHONY: all run gui clean help lint lint-verilator lint-cadence synth \
-        sim-iverilog iverilog sim-verilator verilator pnr-place pnr
+        sim-iverilog iverilog sim-verilator verilator pnr-place pnr \
+        test-4x4 test-8x8 test-16x16 test-scaling
 
 # Default target: Headless simulation
 all: run
@@ -65,6 +66,18 @@ sim-iverilog:
 	vvp $(OUT_DIR)/$(TB_MODULE).vvp
 
 iverilog: sim-iverilog
+
+# --- Array Scaling Verification Targets ---
+test-4x4:
+	@$(MAKE) iverilog TB_MODULE=$(TB_MODULE)
+
+test-8x8:
+	@$(MAKE) iverilog TB_MODULE=$(subst _tb,_8x8_tb,$(TB_MODULE))
+
+test-16x16:
+	@$(MAKE) iverilog TB_MODULE=$(subst _tb,_16x16_tb,$(TB_MODULE))
+
+test-scaling: test-4x4 test-8x8 test-16x16
 
 sim-verilator:
 	@echo "=================================================================="

@@ -12,6 +12,7 @@ GUI           ?= 0
 .PHONY: help all lint lint-verilator lint-cadence \
         run-model1 run-model2 run-model3 run-all \
         iverilog-model1 iverilog-model2 iverilog-model3 \
+        test-scaling-model1 test-scaling-model2 test-scaling-model3 test-scaling-all \
         verilator-model1 verilator-model2 verilator-model3 \
         synth-model1 synth-model2 synth-model3 synth-all \
         pnr-place-model1 pnr-place-model2 pnr-place-model3 pnr-place-all \
@@ -33,9 +34,15 @@ help:
 	@echo "   make run-all    [GUI=0/1]   - Run all 3 models sequentially"
 	@echo ""
 	@echo " Fast Icarus Verilog Simulation Shortcuts (< 1s):"
-	@echo "   make iverilog-model1        - Run Model 1 with Icarus"
-	@echo "   make iverilog-model2        - Run Model 2 with Icarus"
-	@echo "   make iverilog-model3        - Run Model 3 with Icarus"
+	@echo "   make iverilog-model1        - Run Model 1 with Icarus (4x4 baseline)"
+	@echo "   make iverilog-model2        - Run Model 2 with Icarus (4x4 baseline)"
+	@echo "   make iverilog-model3        - Run Model 3 with Icarus (4x4 baseline)"
+	@echo ""
+	@echo " Array Scaling Verification Targets (4x4, 8x8, 16x16):"
+	@echo "   make test-scaling-model1    - Verify Model 1 across 4x4, 8x8, and 16x16"
+	@echo "   make test-scaling-model2    - Verify Model 2 across 4x4, 8x8, and 16x16"
+	@echo "   make test-scaling-model3    - Verify Model 3 across 4x4, 8x8, and 16x16"
+	@echo "   make test-scaling-all       - Verify all 3 models across all array sizes"
 	@echo ""
 	@echo " Verilator Cycle Simulation Shortcuts:"
 	@echo "   make verilator-model1       - Run Model 1 with Verilator"
@@ -84,6 +91,18 @@ iverilog-model2:
 
 iverilog-model3:
 	@$(MAKE) -C models/$(MODEL_VARIANT)/heterogeneous_fission iverilog
+
+# --- Array Scaling Verification Shortcuts (4x4, 8x8, 16x16) ---
+test-scaling-model1:
+	@$(MAKE) -C models/$(MODEL_VARIANT)/dataflow_switching test-scaling
+
+test-scaling-model2:
+	@$(MAKE) -C models/$(MODEL_VARIANT)/spatial_fission test-scaling
+
+test-scaling-model3:
+	@$(MAKE) -C models/$(MODEL_VARIANT)/heterogeneous_fission test-scaling
+
+test-scaling-all: test-scaling-model1 test-scaling-model2 test-scaling-model3
 
 # --- Verilator Cycle Simulation Shortcuts ---
 verilator-model1:

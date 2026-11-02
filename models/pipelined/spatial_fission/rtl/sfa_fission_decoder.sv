@@ -4,13 +4,14 @@
 `timescale 1ns/1ps
 
 module sfa_fission_decoder #(
-    parameter int NUM_COLS = 4
+    parameter int NUM_COLS = 4,
+    parameter int SPLIT_W  = ($clog2(NUM_COLS + 1) >= 4) ? $clog2(NUM_COLS + 1) : 4
 ) (
     input  logic                 clk,
     input  logic                 rst_n,
 
     // Dispatch configuration
-    input  logic [3:0]           cfg_split_col,
+    input  logic [SPLIT_W-1:0]   cfg_split_col,
     input  logic                 cfg_update_strobe,
 
     // Generated masks

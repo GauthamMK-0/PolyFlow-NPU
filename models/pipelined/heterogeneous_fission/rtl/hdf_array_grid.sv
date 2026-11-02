@@ -67,7 +67,8 @@ module hdf_array_grid #(
     // Col 0 receives din_w_region_a
     // Col c receives din_w_region_b if crossing boundary (is_boundary_col[c]), else mesh_e from left
     for (genvar r = 0; r < NUM_ROWS; r++) begin : gen_west_in
-        assign mesh_w[r][0] = din_w_region_a[r*DATA_W +: DATA_W];
+        assign mesh_w[r][0] = region_id_mask[0] ?
+                              din_w_region_b[r*DATA_W +: DATA_W] : din_w_region_a[r*DATA_W +: DATA_W];
         for (genvar c = 1; c < NUM_COLS; c++) begin : gen_west_inner
             assign mesh_w[r][c] = is_boundary_col[c] ?
                                   din_w_region_b[r*DATA_W +: DATA_W] : mesh_e[r][c-1];
