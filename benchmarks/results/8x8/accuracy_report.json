@@ -6,7 +6,7 @@
     "match_rate_pct": 100.0,
     "mae": 0.0,
     "mse": 0.0,
-    "cosine_similarity": 0.05338045424459053,
+    "cosine_similarity": -0.009472628179691533,
     "status": "PASS (Bit-Exact 100%)"
   },
   {
@@ -16,7 +16,7 @@
     "match_rate_pct": 100.0,
     "mae": 0.0,
     "mse": 0.0,
-    "cosine_similarity": 1.0,
+    "cosine_similarity": 0.021030974167458562,
     "status": "PASS (Bit-Exact 100%)"
   },
   {
@@ -26,7 +26,7 @@
     "match_rate_pct": 100.0,
     "mae": 0.0,
     "mse": 0.0,
-    "cosine_similarity": -0.04860367049016722,
+    "cosine_similarity": 0.011889819204088712,
     "status": "PASS (Bit-Exact 100%)"
   }
 ]
