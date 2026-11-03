@@ -82,19 +82,33 @@ run_model_suite() {
         TOTAL_MODELS=$((TOTAL_MODELS + 1))
 
         set +e
+        local item_scale="4x4"
+        if [[ "$tb_module" =~ "16x16" ]]; then
+            item_scale="16x16"
+        elif [[ "$tb_module" =~ "8x8" ]]; then
+            item_scale="8x8"
+        fi
+
         if [ "$SIM_TOOL" = "verilator" ]; then
+            local v_obj_dir="obj_dir/${item_scale}"
+            mkdir -p "$v_obj_dir"
             verilator -j "$(nproc)" --binary --timing -Wall -Itb \
+                --Mdir "$v_obj_dir" \
                 -MAKEFLAGS "-j$(nproc) OPT_FAST=-O1" \
                 rtl/*.sv "tb/${tb_module}.sv" --top-module "$tb_module" -o "V${tb_module}" > /dev/null 2>&1
-            "./obj_dir/V${tb_module}" 2>&1 | tee "$log_file"
+            "./${v_obj_dir}/V${tb_module}" 2>&1 | tee "$log_file"
             cmd_rc=${PIPESTATUS[0]}
         elif [ "$SIM_TOOL" = "xrun" ] || [ "$SIM_TOOL" = "cadence" ]; then
-            make run GUI=0 2>&1 | tee "$log_file"
+            make run SCALE="$item_scale" GUI=0 2>&1 | tee "$log_file"
             cmd_rc=${PIPESTATUS[0]}
         elif [ "$SIM_TOOL" = "iverilog" ]; then
-            mkdir -p output
-            iverilog -g2012 -I tb -o "output/${tb_module}.vvp" rtl/*.sv "tb/${tb_module}.sv"
-            vvp "output/${tb_module}.vvp" 2>&1 | tee "$log_file"
+            mkdir -p "output/${item_scale}"
+            iverilog -g2012 -I tb -o "output/${item_scale}/${tb_module}.vvp" rtl/*.sv "tb/${tb_module}.sv"
+            if [ "$item_scale" = "4x4" ]; then
+                mkdir -p output
+                cp -f "output/${item_scale}/${tb_module}.vvp" "output/${tb_module}.vvp"
+            fi
+            vvp "output/${item_scale}/${tb_module}.vvp" 2>&1 | tee "$log_file"
             cmd_rc=${PIPESTATUS[0]}
         else
             echo "Error: Unknown simulation tool '$SIM_TOOL'. Choose 'verilator', 'iverilog', or 'xrun'/'cadence'."

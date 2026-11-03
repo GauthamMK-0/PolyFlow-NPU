@@ -1,6 +1,25 @@
 # ==============================================================================
 # Cadence Genus Synthesis TCL Script for HDF Top (Model 3: Non-Pipelined Baseline)
+# Supports Multi-Scale Synthesis: 4x4, 8x8, 16x16
 # ==============================================================================
+
+# --- Scale Configuration (4x4, 8x8, 16x16) ---
+set SCALE [expr {[info exists env(SCALE)] ? $env(SCALE) : "4x4"}]
+if {$SCALE eq "8x8"} {
+    set NUM_ROWS 8
+    set NUM_COLS 8
+} elseif {$SCALE eq "16x16"} {
+    set NUM_ROWS 16
+    set NUM_COLS 16
+} else {
+    set SCALE "4x4"
+    set NUM_ROWS 4
+    set NUM_COLS 4
+}
+
+puts "=================================================================="
+puts " \[GENUS SYNTHESIS\] Target: hdf_top (Non-Pipelined) | Scale: ${SCALE} (${NUM_ROWS}x${NUM_COLS})"
+puts "=================================================================="
 
 # --- Design & Path Configurations ---
 set_db use_scan_seqs_for_non_dft false
@@ -25,11 +44,17 @@ read_hdl -sv {
 }
 
 # --- Elaborate Top Level Design ---
-elaborate hdf_top
+if {$SCALE eq "4x4"} {
+    elaborate hdf_top
+} else {
+    elaborate hdf_top -parameters [list [list NUM_ROWS $NUM_ROWS] [list NUM_COLS $NUM_COLS]]
+}
 init_design
 
 # --- Load Timing Constraints ---
-if {[file exists hdf_top.sdc]} {
+if {[file exists hdf_top_${SCALE}.sdc]} {
+    read_sdc hdf_top_${SCALE}.sdc
+} elseif {[file exists hdf_top.sdc]} {
     read_sdc hdf_top.sdc
 } else {
     # Default fallback: 200 MHz / 5.000 ns clock on clk
@@ -53,25 +78,45 @@ syn_map
 syn_opt
 
 # --- Timing, Power, Area, and Summary Reports ---
-file mkdir reports
-report_timing  > reports/timing_hdf.rpt
-report_power   > reports/power_hdf.rpt
-report_area    > reports/area_hdf.rpt
-report_qor     > reports/qor_hdf.rpt
-report_gates   > reports/gates_hdf.rpt
+set REPORT_DIR "reports/${SCALE}"
+file mkdir $REPORT_DIR
+report_timing  > ${REPORT_DIR}/timing_hdf.rpt
+report_power   > ${REPORT_DIR}/power_hdf.rpt
+report_area    > ${REPORT_DIR}/area_hdf.rpt
+report_qor     > ${REPORT_DIR}/qor_hdf.rpt
+report_gates   > ${REPORT_DIR}/gates_hdf.rpt
+
+# Backward compatibility mirror for 4x4
+if {$SCALE eq "4x4"} {
+    file mkdir reports
+    catch { file copy -force ${REPORT_DIR}/timing_hdf.rpt reports/timing_hdf.rpt }
+    catch { file copy -force ${REPORT_DIR}/power_hdf.rpt reports/power_hdf.rpt }
+    catch { file copy -force ${REPORT_DIR}/area_hdf.rpt reports/area_hdf.rpt }
+    catch { file copy -force ${REPORT_DIR}/qor_hdf.rpt reports/qor_hdf.rpt }
+    catch { file copy -force ${REPORT_DIR}/gates_hdf.rpt reports/gates_hdf.rpt }
+}
 
 # --- Netlist & Gate-Level Files Generation ---
-file mkdir netlist
-write_hdl > netlist/hdf_top_netlist.v
-write_sdc > netlist/hdf_top_netlist.sdc
-write_sdf -timescale ns -nonegchecks -recrem split -edges check_edge -setuphold split > netlist/hdf_top_netlist.sdf
+set NETLIST_DIR "netlist/${SCALE}"
+file mkdir $NETLIST_DIR
+write_hdl > ${NETLIST_DIR}/hdf_top_netlist.v
+write_sdc > ${NETLIST_DIR}/hdf_top_netlist.sdc
+write_sdf -timescale ns -nonegchecks -recrem split -edges check_edge -setuphold split > ${NETLIST_DIR}/hdf_top_netlist.sdf
+
+# Backward compatibility mirror for 4x4
+if {$SCALE eq "4x4"} {
+    file mkdir netlist
+    catch { file copy -force ${NETLIST_DIR}/hdf_top_netlist.v netlist/hdf_top_netlist.v }
+    catch { file copy -force ${NETLIST_DIR}/hdf_top_netlist.sdc netlist/hdf_top_netlist.sdc }
+    catch { file copy -force ${NETLIST_DIR}/hdf_top_netlist.sdf netlist/hdf_top_netlist.sdf }
+}
 
 puts "=================================================================="
-puts " \[SYNTHESIS EXECUTIVE SUMMARY: hdf_top @ 200 MHz\]"
+puts " \[SYNTHESIS EXECUTIVE SUMMARY: hdf_top (${SCALE}) @ 200 MHz\]"
 puts "=================================================================="
 report_qor
 report_area
 report_timing
 puts "=================================================================="
-puts " Genus Synthesis Finished Successfully! Check reports/ and netlist/ for details."
+puts " Genus Synthesis Finished Successfully! Check ${REPORT_DIR}/ and ${NETLIST_DIR}/ for details."
 puts "=================================================================="

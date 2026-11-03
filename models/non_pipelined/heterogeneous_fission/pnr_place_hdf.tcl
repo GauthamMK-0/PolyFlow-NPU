@@ -3,15 +3,18 @@
 # Aligned with mt_npu/models/pipelined/heterogeneous_fission/netlist/innovus.cmd
 # Target: 90nm Standard Cell Library (gsclib090_translated.lef)
 # Design: hdf_top (Model 3: Heterogeneous Spatial Fission / PolyFlow-NPU (Non-Pipelined))
+# Supports Multi-Scale Place & Route: 4x4, 8x8, 16x16
 # MMMC: slow.lib (MAX/SETUP), fast.lib (MIN/HOD), gpdk090.lef.extended.CapTbl (CAP)
 # Flow Scope: Full Physical Design Flow (Floorplan, PDN, Place, CTS, Route)
 # ============================================================================
 
 # ---> ONLY EDIT THESE 4 PATHS/NAMES <---
-set DESIGN_NAME  "hdf_top"                                     ;# Top Verilog module name
-set NETLIST_FILE "netlist/hdf_top_netlist.v"                   ;# Genus synthesized gate-level netlist
+set DESIGN_NAME  "hdf_top"                              ;# Top Verilog module name
 set LEF_FILES    "/home/cadence/install/FOUNDRY/digital/90nm/dig/lef/gsclib090_translated.lef"
-set MMMC_FILE    "viewDefinition_hdf_top.tcl"                         ;# MMMC configuration file
+
+# Scale resolution: 4x4, 8x8, 16x16
+set SCALE [expr {[info exists env(SCALE)] ? $env(SCALE) : "4x4"}]
+set MMMC_FILE    "viewDefinition_${DESIGN_NAME}_${SCALE}.tcl"  ;# Scale-specific MMMC file
 
 # Execution Control: Set to 0 for complete Post-Route flow (per innovus.cmd); set to 1 to stop at CTS
 set STOP_AT_CTS  0
@@ -24,14 +27,29 @@ catch { setMultiCpuUsage -localCpu $MULTI_CPU -keepLicense true }
 
 set FOUNDRY_PATH [expr {[info exists env(FOUNDRY_PATH)] ? $env(FOUNDRY_PATH) : "/home/cadence/install/FOUNDRY/digital/90nm/dig"}]
 
-# Output directories
+# Output directories partitioned by scale
+set DB_DIR "db/${SCALE}"
+set OUTPUTS_DIR "outputs/${SCALE}"
+set REPORT_DIR "reports/${SCALE}"
+
 file mkdir db
 file mkdir DBS
 file mkdir outputs
 file mkdir reports/cts
+file mkdir $DB_DIR
+file mkdir $OUTPUTS_DIR
+file mkdir ${REPORT_DIR}/cts
 
-if {![file exists $NETLIST_FILE] && [file exists "${DESIGN_NAME}_netlist.v"]} {
+# Resolve Netlist File per scale
+set NETLIST_FILE ""
+if {[file exists "netlist/${SCALE}/${DESIGN_NAME}_netlist.v"]} {
+    set NETLIST_FILE "netlist/${SCALE}/${DESIGN_NAME}_netlist.v"
+} elseif {[file exists "netlist/${DESIGN_NAME}_netlist.v"]} {
+    set NETLIST_FILE "netlist/${DESIGN_NAME}_netlist.v"
+} elseif {[file exists "${DESIGN_NAME}_netlist.v"]} {
     set NETLIST_FILE "${DESIGN_NAME}_netlist.v"
+} else {
+    set NETLIST_FILE "netlist/${SCALE}/${DESIGN_NAME}_netlist.v"
 }
 
 if {![file exists $LEF_FILES] && [file exists "${FOUNDRY_PATH}/lef/gsclib090_translated.lef"]} {
@@ -42,7 +60,9 @@ set SLOW_LIB "${FOUNDRY_PATH}/lib/slow.lib"
 set FAST_LIB "${FOUNDRY_PATH}/lib/fast.lib"
 set CAP_TABLE "${FOUNDRY_PATH}/captable/gpdk090.lef.extended.CapTbl"
 
-if {[file exists "netlist/${DESIGN_NAME}_netlist.sdc"]} {
+if {[file exists "netlist/${SCALE}/${DESIGN_NAME}_netlist.sdc"]} {
+    set SDC_FILE "netlist/${SCALE}/${DESIGN_NAME}_netlist.sdc"
+} elseif {[file exists "netlist/${DESIGN_NAME}_netlist.sdc"]} {
     set SDC_FILE "netlist/${DESIGN_NAME}_netlist.sdc"
 } elseif {[file exists "${DESIGN_NAME}_netlist.sdc"]} {
     set SDC_FILE "${DESIGN_NAME}_netlist.sdc"
@@ -69,10 +89,15 @@ if {![file exists $MMMC_FILE]} {
 
 puts "=================================================================="
 puts " Innovus Physical Design Parameters:"
+puts "   SCALE:        $SCALE"
 puts "   DESIGN_NAME:  $DESIGN_NAME"
 puts "   NETLIST_FILE: $NETLIST_FILE"
+puts "   SDC_FILE:     $SDC_FILE"
 puts "   LEF_FILES:    $LEF_FILES"
 puts "   MMMC_FILE:    $MMMC_FILE"
+puts "   DB_DIR:       $DB_DIR"
+puts "   OUTPUTS_DIR:  $OUTPUTS_DIR"
+puts "   REPORT_DIR:   $REPORT_DIR"
 puts "   SETUP_LIB:    $SLOW_LIB"
 puts "   HOLD_LIB:     $FAST_LIB"
 puts "   CAP_TABLE:    $CAP_TABLE"
@@ -96,7 +121,8 @@ set init_design_uniquify 1
 init_design
 checkDesign -all
 
-saveDesign db/${DESIGN_NAME}_01_init.enc
+saveDesign ${DB_DIR}/${DESIGN_NAME}_01_init.enc
+if {$SCALE eq "4x4"} { saveDesign db/${DESIGN_NAME}_01_init.enc }
 
 # ----------------------------------------------------------------------------
 # 2. Floorplanning (Matching innovus.cmd: gsclib090site, -r 1 0.7 20 20 20 20)
@@ -177,8 +203,11 @@ sroute -connect { blockPin padPin padRing corePin floatingStripe } \
     -blockPin useLef \
     -targetViaLayerRange { Metal1(1) Metal9(9) }
 
-saveDesign ${DESIGN_NAME}_power.enc
-saveDesign db/${DESIGN_NAME}_02_power.enc
+saveDesign ${DB_DIR}/${DESIGN_NAME}_02_power.enc
+if {$SCALE eq "4x4"} {
+    saveDesign ${DESIGN_NAME}_power.enc
+    saveDesign db/${DESIGN_NAME}_02_power.enc
+}
 
 # ----------------------------------------------------------------------------
 # 4. Pre-Place Timing, Standard Cell Placement & Pre-CTS Optimization
@@ -206,7 +235,8 @@ setPlaceMode -fp false
 place_design
 optDesign -preCTS
 
-saveDesign db/${DESIGN_NAME}_03_placed.enc
+saveDesign ${DB_DIR}/${DESIGN_NAME}_03_placed.enc
+if {$SCALE eq "4x4"} { saveDesign db/${DESIGN_NAME}_03_placed.enc }
 
 # ----------------------------------------------------------------------------
 # 5. Clock Tree Synthesis (CCOpt Engine - Matching cts.tcl & ccopt.spec)
@@ -222,17 +252,24 @@ set_ccopt_property inverter_cells {CLKINVX6 CLKINVX8 CLKINVX12}
 set_ccopt_property clock_gating_cells TLATNTSCA*
 set_ccopt_property target_max_trans 0.5
 
-create_ccopt_clock_tree_spec -file ccopt.spec
-source ccopt.spec
+create_ccopt_clock_tree_spec -file ccopt_${SCALE}.spec
+source ccopt_${SCALE}.spec
 ccopt_design -cts
 
-saveDesign DBS/cts.enc
-saveDesign db/${DESIGN_NAME}_04_cts.enc
+saveDesign ${DB_DIR}/${DESIGN_NAME}_04_cts.enc
+if {$SCALE eq "4x4"} {
+    saveDesign DBS/cts.enc
+    saveDesign db/${DESIGN_NAME}_04_cts.enc
+}
 
-report_ccopt_clock_trees -file clk_trees.rpt
-report_ccopt_skew_groups -file skew_groups.rpt
-report_ccopt_clock_trees -file reports/cts/${DESIGN_NAME}_clock_trees.rpt
-report_ccopt_skew_groups -file reports/cts/${DESIGN_NAME}_skew_groups.rpt
+report_ccopt_clock_trees -file ${REPORT_DIR}/cts/${DESIGN_NAME}_clock_trees.rpt
+report_ccopt_skew_groups -file ${REPORT_DIR}/cts/${DESIGN_NAME}_skew_groups.rpt
+if {$SCALE eq "4x4"} {
+    report_ccopt_clock_trees -file clk_trees.rpt
+    report_ccopt_skew_groups -file skew_groups.rpt
+    catch { file copy -force ${REPORT_DIR}/cts/${DESIGN_NAME}_clock_trees.rpt reports/cts/${DESIGN_NAME}_clock_trees.rpt }
+    catch { file copy -force ${REPORT_DIR}/cts/${DESIGN_NAME}_skew_groups.rpt reports/cts/${DESIGN_NAME}_skew_groups.rpt }
+}
 
 # ----------------------------------------------------------------------------
 # 6. Post-CTS Timing Optimization (Setup & Hold)
@@ -244,13 +281,21 @@ optDesign -postCTS -hold
 set dbgLefDefOutVersion 5.8
 global dbgLefDefOutVersion
 set dbgLefDefOutVersion 5.8
-defOut -floorplan -netlist -routing ${DESIGN_NAME}_cts.def
-defOut -floorplan -netlist -routing outputs/${DESIGN_NAME}_cts.def
-saveNetlist outputs/${DESIGN_NAME}_cts.v
-write_sdf outputs/${DESIGN_NAME}_cts.sdf
 
-saveDesign ${DESIGN_NAME}_cts.enc
-saveDesign db/${DESIGN_NAME}_05_postcts.enc
+defOut -floorplan -netlist -routing ${OUTPUTS_DIR}/${DESIGN_NAME}_cts.def
+saveNetlist ${OUTPUTS_DIR}/${DESIGN_NAME}_cts.v
+write_sdf ${OUTPUTS_DIR}/${DESIGN_NAME}_cts.sdf
+
+saveDesign ${DB_DIR}/${DESIGN_NAME}_05_postcts.enc
+
+if {$SCALE eq "4x4"} {
+    defOut -floorplan -netlist -routing ${DESIGN_NAME}_cts.def
+    defOut -floorplan -netlist -routing outputs/${DESIGN_NAME}_cts.def
+    saveNetlist outputs/${DESIGN_NAME}_cts.v
+    write_sdf outputs/${DESIGN_NAME}_cts.sdf
+    saveDesign ${DESIGN_NAME}_cts.enc
+    saveDesign db/${DESIGN_NAME}_05_postcts.enc
+}
 
 if {$STOP_AT_CTS} {
     puts "INFO: STOP_AT_CTS is enabled (Flow completed at Post-CTS stage)."
@@ -278,25 +323,38 @@ addFiller -cell FILL1 FILL2 FILL4 FILL8 FILL16 -prefix FILLER
 # ----------------------------------------------------------------------------
 # 8. Final Signoff Deliverables & Reports
 # ----------------------------------------------------------------------------
-saveDesign ${DESIGN_NAME}_routed.enc
-saveDesign db/${DESIGN_NAME}_06_postroute.enc
+saveDesign ${DB_DIR}/${DESIGN_NAME}_06_postroute.enc
+if {$SCALE eq "4x4"} {
+    saveDesign ${DESIGN_NAME}_routed.enc
+    saveDesign db/${DESIGN_NAME}_06_postroute.enc
+}
 
-set dbgLefDefOutVersion 5.8
-global dbgLefDefOutVersion
-set dbgLefDefOutVersion 5.8
-defOut -floorplan -netlist -routing ${DESIGN_NAME}.def
-defOut -floorplan -netlist -routing ${DESIGN_NAME}_routed.def
-defOut -floorplan -netlist -routing outputs/${DESIGN_NAME}_postroute.def
+defOut -floorplan -netlist -routing ${OUTPUTS_DIR}/${DESIGN_NAME}_postroute.def
+saveNetlist ${OUTPUTS_DIR}/${DESIGN_NAME}_postroute.v
+write_sdf ${OUTPUTS_DIR}/${DESIGN_NAME}_postroute.sdf
 
-saveNetlist outputs/${DESIGN_NAME}_postroute.v
-write_sdf outputs/${DESIGN_NAME}_postroute.sdf
+if {$SCALE eq "4x4"} {
+    defOut -floorplan -netlist -routing ${DESIGN_NAME}.def
+    defOut -floorplan -netlist -routing ${DESIGN_NAME}_routed.def
+    defOut -floorplan -netlist -routing outputs/${DESIGN_NAME}_postroute.def
+    saveNetlist outputs/${DESIGN_NAME}_postroute.v
+    write_sdf outputs/${DESIGN_NAME}_postroute.sdf
+}
 
 report_power
-report_power -outfile reports/${DESIGN_NAME}_postroute_power.rpt
-summaryReport -noHtml -outfile reports/${DESIGN_NAME}_postroute_summary.rpt
-verify_drc -report reports/${DESIGN_NAME}_postroute_drc.rpt
-verifyConnectivity -type all -report reports/${DESIGN_NAME}_postroute_connectivity.rpt
+report_power -outfile ${REPORT_DIR}/${DESIGN_NAME}_postroute_power.rpt
+summaryReport -noHtml -outfile ${REPORT_DIR}/${DESIGN_NAME}_postroute_summary.rpt
+verify_drc -report ${REPORT_DIR}/${DESIGN_NAME}_postroute_drc.rpt
+verifyConnectivity -type all -report ${REPORT_DIR}/${DESIGN_NAME}_postroute_connectivity.rpt
+
+if {$SCALE eq "4x4"} {
+    catch { file copy -force ${REPORT_DIR}/${DESIGN_NAME}_postroute_power.rpt reports/${DESIGN_NAME}_postroute_power.rpt }
+    catch { file copy -force ${REPORT_DIR}/${DESIGN_NAME}_postroute_summary.rpt reports/${DESIGN_NAME}_postroute_summary.rpt }
+    catch { file copy -force ${REPORT_DIR}/${DESIGN_NAME}_postroute_drc.rpt reports/${DESIGN_NAME}_postroute_drc.rpt }
+    catch { file copy -force ${REPORT_DIR}/${DESIGN_NAME}_postroute_connectivity.rpt reports/${DESIGN_NAME}_postroute_connectivity.rpt }
+}
 
 puts "========================================================"
-puts " Full Physical Design Flow Completed Successfully!      "
+puts " Full Physical Design Flow Completed Successfully for ${DESIGN_NAME} (${SCALE})!"
+puts " Deliverables in ${OUTPUTS_DIR}/, ${DB_DIR}/, and ${REPORT_DIR}/"
 puts "========================================================"
