@@ -1,0 +1,8 @@
+{
+  "model": "Model 1 (Sequential Switching)",
+  "scale": "16x16",
+  "cnn_cycles": 84,
+  "vit_cycles": 66,
+  "total_makespan_cycles": 156,
+  "total_valid_macs": 32768
+}

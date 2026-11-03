@@ -1,0 +1,32 @@
+[
+  {
+    "label": "Model 1: ResNet-50 CNN (Weight-Stationary)",
+    "total_elements": 16,
+    "matching_elements": 16,
+    "match_rate_pct": 100.0,
+    "mae": 0.0,
+    "mse": 0.0,
+    "cosine_similarity": -0.006967880663883434,
+    "status": "PASS (Bit-Exact 100%)"
+  },
+  {
+    "label": "Model 1: ViT Attention (Output-Stationary)",
+    "total_elements": 16,
+    "matching_elements": 16,
+    "match_rate_pct": 100.0,
+    "mae": 0.0,
+    "mse": 0.0,
+    "cosine_similarity": 1.0,
+    "status": "PASS (Bit-Exact 100%)"
+  },
+  {
+    "label": "Model 3: PolyFlow-NPU Concurrent Execution (Region A: WS + Region B: OS)",
+    "total_elements": 16,
+    "matching_elements": 16,
+    "match_rate_pct": 100.0,
+    "mae": 0.0,
+    "mse": 0.0,
+    "cosine_similarity": -0.9160736941116111,
+    "status": "PASS (Bit-Exact 100%)"
+  }
+]

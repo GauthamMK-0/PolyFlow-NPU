@@ -328,6 +328,22 @@ sim-iverilog:
 sim-xrun:
 	./scripts/run_all_models.sh xrun all
 
+# --- Real-Workload Benchmarks & Accuracy Co-Verification ---
+benchmark:
+	@$(MAKE) -C benchmarks run
+
+benchmark-4x4:
+	@$(MAKE) -C benchmarks run-4x4
+
+benchmark-8x8:
+	@$(MAKE) -C benchmarks run-8x8
+
+benchmark-16x16:
+	@$(MAKE) -C benchmarks run-16x16
+
+benchmark-verify:
+	@$(MAKE) -C benchmarks verify
+
 # --- Clean Target ---
 clean:
 	@$(MAKE) -C models/pipelined/dataflow_switching clean
