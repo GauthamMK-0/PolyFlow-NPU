@@ -1,8 +1,8 @@
 {
   "model": "Model 3 (Heterogeneous Fission / PolyFlow-NPU)",
   "scale": "8x8",
-  "reg_a_cycles": 37,
-  "reg_b_cycles": 37,
-  "total_makespan_cycles": 41,
+  "reg_a_cycles": 35,
+  "reg_b_cycles": 35,
+  "total_makespan_cycles": 35,
   "total_valid_macs": 2048
 }

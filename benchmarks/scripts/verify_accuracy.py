@@ -40,11 +40,13 @@ def evaluate_accuracy(hw_mat, golden_mat, label):
     mae = float(np.mean(np.abs(diff)))
     mse = float(np.mean(diff ** 2))
 
-    # Cosine similarity
-    norm_hw = np.linalg.norm(hw_mat.flatten())
-    norm_gold = np.linalg.norm(golden_mat.flatten())
+    # Cosine similarity (cast to float64 to prevent int32 dot-product overflow)
+    hw_f64 = hw_mat.flatten().astype(np.float64)
+    gold_f64 = golden_mat.flatten().astype(np.float64)
+    norm_hw = np.linalg.norm(hw_f64)
+    norm_gold = np.linalg.norm(gold_f64)
     if norm_hw > 0 and norm_gold > 0:
-        cos_sim = float(np.dot(hw_mat.flatten(), golden_mat.flatten()) / (norm_hw * norm_gold))
+        cos_sim = float(np.dot(hw_f64, gold_f64) / (norm_hw * norm_gold))
     else:
         cos_sim = 1.0 if np.array_equal(hw_mat, golden_mat) else 0.0
 
@@ -86,6 +88,7 @@ def verify_scale(scale_name):
 
     hw_m1_cnn = load_matrix_txt(os.path.join(results_dir, "m1_cnn_hw_output.txt"))
     hw_m1_vit = load_matrix_txt(os.path.join(results_dir, "m1_vit_hw_output.txt"))
+    hw_m2_combined = load_matrix_txt(os.path.join(results_dir, "m2_multitenant_hw_output.txt"))
     hw_m3_combined = load_matrix_txt(os.path.join(results_dir, "m3_multitenant_hw_output.txt"))
 
     print(f"\n========================================================")
@@ -105,7 +108,12 @@ def verify_scale(scale_name):
     all_passed = all_passed and p2
     if s2: scale_stats.append(s2)
 
-    # 3. Model 3 Multi-Tenant Concurrent Execution Verification
+    # 3. Model 2 Multi-Tenant Homogeneous Fission Verification
+    p2m, s2m = evaluate_accuracy(hw_m2_combined, golden_combined, "Model 2: Planaria Homogeneous Fission (Region A: WS + Region B: Forced WS)")
+    all_passed = all_passed and p2m
+    if s2m: scale_stats.append(s2m)
+
+    # 4. Model 3 Multi-Tenant Concurrent Execution Verification
     p3, s3 = evaluate_accuracy(hw_m3_combined, golden_combined, "Model 3: PolyFlow-NPU Concurrent Execution (Region A: WS + Region B: OS)")
     all_passed = all_passed and p3
     if s3: scale_stats.append(s3)

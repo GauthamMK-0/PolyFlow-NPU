@@ -1,6 +1,9 @@
 // cosim_model2_sfa_tb.sv — Cycle-Accurate Co-Simulation Testbench for Model 2 (Planaria Baseline)
-// Slices physical array into Region A and Region B, but FORCES both to Weight-Stationary (WS).
-// Measures multi-tenant makespan, memory reload stall cycles, and dumps accumulators for accuracy verification.
+// Slices physical array into Region A and Region B, with BOTH regions hardware-pinned to Weight-Stationary (WS).
+// Region A executes CNN natively (1 weight load + K compute cycles).
+// Region B executes ViT Attention Q*K^T in forced WS mode: since K[k][r] changes on every step k,
+// sfa_pe must alternate 1 cycle of w_ld (loading K[k][r] into stat_weight) and 1 cycle of compute_en (multiplying by Q[k]),
+// producing the 100% bit-exact mathematical output while exposing the true physical WS reload stall penalty.
 
 `timescale 1ns/1ps
 
@@ -87,10 +90,6 @@ module cosim_model2_sfa_tb;
     function automatic logic signed [ACC_W-1:0] get_pe_acc(int r, int c);
         return acc_out_flat[(r*NUM_COLS + c)*ACC_W +: ACC_W];
     endfunction
-
-    task automatic set_din_n(int c, logic [DATA_W-1:0] val);
-        din_n[c*DATA_W +: DATA_W] = val;
-    endtask
 
     task automatic set_din_w_a(int r, logic [DATA_W-1:0] val);
         din_w_region_a[r*DATA_W +: DATA_W] = val;
@@ -191,83 +190,86 @@ module cosim_model2_sfa_tb;
 
         repeat (3) @(posedge clk);
         rst_n = 1;
-        step_clk();
-
-        // Strobe column split boundary
-        cfg_update_strobe = 1;
-        step_clk();
-        cfg_update_strobe = 0;
-        acc_clr = 2'b00;
-        step_clk();
-
-        $display("Dynamic Boundary Split applied at Col %0d (Mask = %b)", HALF_COLS, region_id_mask);
+        #1;
+        cycle_count = 0;
 
         // -------------------------------------------------------------
         // Concurrent Multi-Tenant Execution
-        // Region A: CNN (Native WS mode)
-        // Region B: ViT Attention (FORCED into WS mode with weight reload stalls)
+        // Region A: CNN (Native WS mode: 1 w_ld + K compute + 1 drain)
+        // Region B: ViT Attention (Forced WS mode on sfa_pe: K pairs of [w_ld K[k], compute Q[k]] + 1 drain)
         // -------------------------------------------------------------
         start_cycle_total = cycle_count;
 
-        // Step 1: Preload stationary weights for Region A & initial key-slice for Region B
-        w_ld = 2'b11;
-        for (int c = 0; c < HALF_COLS; c++) begin
-            for (int r = 0; r < NUM_ROWS; r++) begin
-                set_din_w_a(r, cnn_weights_mem[r][c]);
-                set_din_w_b(r, vit_k_mem[0][r]); // Forced to treat key as stationary weight
-            end
-            step_clk();
-        end
-        w_ld = 2'b00;
+        // Cycle 1: Strobe column split boundary & clear accumulators
+        cfg_update_strobe = 1;
+        acc_clr           = 2'b11;
         step_clk();
+        cfg_update_strobe = 0;
+        acc_clr           = 2'b00;
 
-        // Step 2: Stream inputs into Region A & stream queries into Region B
-        compute_en = 2'b11;
-        for (int k = 0; k < K_STEPS; k++) begin
-            for (int r = 0; r < NUM_ROWS; r++) begin
-                set_din_w_a(r, cnn_inputs_mem[k][r]);
-            end
-            for (int c = HALF_COLS; c < NUM_COLS; c++) begin
-                set_din_n(c, vit_q_mem[k][c]);
-            end
-            step_clk();
-            total_active_macs += (NUM_ROWS * HALF_COLS); // Region A active
-            total_active_macs += (NUM_ROWS * HALF_COLS); // Region B active
-        end
+        $display("Dynamic Boundary Split applied at Col %0d (Mask = %b)", HALF_COLS, region_id_mask);
 
-        // Region A completes first (native WS)
-        din_w_region_a = '0;
-        step_clk();
-        step_clk();
-        end_cycle_reg_a = cycle_count;
-        $display("Region A (CNN Native WS) Completed: %0d cycles", (end_cycle_reg_a - start_cycle_total));
-
-        // Region B suffers forced-WS memory reload penalty:
-        // Must stall to reload subsequent key slices and re-accumulate
-        $display("Region B suffering forced WS memory buffer reload stalls...");
-        compute_en[1] = 0;
-        for (int reload = 1; reload < 3; reload++) begin
-            w_ld[1] = 1; // Stall to reload key vectors into PEs
-            for (int r = 0; r < NUM_ROWS; r++) begin
-                set_din_w_b(r, vit_k_mem[reload % K_STEPS][r]);
+        // Cycles 2 .. 2K+1: Execute Region A (finishes at t = K+1) and Region B (finishes at t = 2K) concurrently
+        for (int t = 0; t < 2 * K_STEPS; t++) begin
+            // --- Region A (CNN in Native WS) ---
+            if (t == 0) begin
+                // Preload stationary CNN weights
+                w_ld[0]       = 1'b1;
+                compute_en[0] = 1'b0;
+                for (int r = 0; r < NUM_ROWS; r++) begin
+                    set_din_w_a(r, cnn_weights_mem[r][0]);
+                end
+            end else if (t >= 1 && t <= K_STEPS) begin
+                // Stream K_STEPS CNN activations
+                w_ld[0]       = 1'b0;
+                compute_en[0] = 1'b1;
+                for (int r = 0; r < NUM_ROWS; r++) begin
+                    set_din_w_a(r, cnn_inputs_mem[t-1][r]);
+                end
+                total_active_macs += (NUM_ROWS * HALF_COLS);
+            end else begin
+                // Region A drain & idle while waiting for Region B
+                w_ld[0]        = 1'b0;
+                compute_en[0]  = 1'b0;
+                din_w_region_a = '0;
             end
-            step_clk();
-            step_clk();
-            w_ld[1] = 0;
-            compute_en[1] = 1;
-            repeat (K_STEPS / 4) begin
-                step_clk();
+
+            // --- Region B (ViT Attention Forced into WS on sfa_pe) ---
+            if ((t % 2) == 0) begin
+                // Even step (t = 2k): Must reload non-stationary key vector K[k][r] into stat_weight
+                w_ld[1]       = 1'b1;
+                compute_en[1] = 1'b0;
+                for (int r = 0; r < NUM_ROWS; r++) begin
+                    set_din_w_b(r, vit_k_mem[t/2][r]);
+                end
+            end else begin
+                // Odd step (t = 2k+1): Multiply stat_weight (K[k][r]) by Q[k]
+                w_ld[1]       = 1'b0;
+                compute_en[1] = 1'b1;
+                for (int r = 0; r < NUM_ROWS; r++) begin
+                    set_din_w_b(r, vit_q_mem[t/2][0]);
+                end
                 total_active_macs += (NUM_ROWS * HALF_COLS);
             end
-            compute_en[1] = 0;
+
+            step_clk();
+
+            // Record exact cycle when Region A finishes its 1-cycle pipeline drain (at end of t == K_STEPS + 1)
+            if (t == K_STEPS + 1) begin
+                end_cycle_reg_a = cycle_count;
+                $display("Region A (CNN Native WS) Completed: %0d cycles", (end_cycle_reg_a - start_cycle_total));
+            end
         end
 
-        din_n = '0;
+        // Final 1-cycle pipeline drain for Region B's last product (t = 2K-1)
+        w_ld           = 2'b00;
+        compute_en     = 2'b00;
+        din_w_region_a = '0;
         din_w_region_b = '0;
         step_clk();
-        step_clk();
+
         end_cycle_reg_b = cycle_count;
-        $display("Region B (ViT Forced WS) Completed: %0d cycles (Stretched by dataflow mismatch)", (end_cycle_reg_b - start_cycle_total));
+        $display("Region B (ViT Forced WS) Completed: %0d cycles (Stretched by per-step WS reload)", (end_cycle_reg_b - start_cycle_total));
 
         // Dump hardware output
         fp = $fopen({"benchmarks/results/", `SCALE_NAME, "/m2_multitenant_hw_output.txt"}, "w");
@@ -286,7 +288,7 @@ module cosim_model2_sfa_tb;
         $fwrite(fp, "  \"scale\": \"%s\",\n", `SCALE_NAME);
         $fwrite(fp, "  \"reg_a_cycles\": %0d,\n", (end_cycle_reg_a - start_cycle_total));
         $fwrite(fp, "  \"reg_b_cycles\": %0d,\n", (end_cycle_reg_b - start_cycle_total));
-        $fwrite(fp, "  \"total_makespan_cycles\": %0d,\n", cycle_count);
+        $fwrite(fp, "  \"total_makespan_cycles\": %0d,\n", (end_cycle_reg_b - start_cycle_total));
         $fwrite(fp, "  \"total_valid_macs\": %0d\n", total_active_macs);
         $fwrite(fp, "}\n");
         $fclose(fp);
@@ -295,11 +297,10 @@ module cosim_model2_sfa_tb;
         $display(" [SUMMARY: MODEL 2 HOMOGENEOUS FISSION]");
         $display("   Region A (CNN Native WS) Cycles: %0d", (end_cycle_reg_a - start_cycle_total));
         $display("   Region B (ViT Forced WS) Cycles: %0d", (end_cycle_reg_b - start_cycle_total));
-        $display("   Total Co-Run Makespan Cycles:    %0d", cycle_count);
-        $display("   Total Valid MACs:                %0d", total_active_macs);
+        $display("   Total Co-Run Makespan Cycles:    %0d", (end_cycle_reg_b - start_cycle_total));
+        $display("   Total Useful MACs:               %0d", total_active_macs);
         $display("================================================================");
         $finish;
     end
 
 endmodule
-

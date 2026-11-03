@@ -200,44 +200,37 @@ module cosim_model3_hdf_tb;
 
         repeat (3) @(posedge clk);
         rst_n = 1;
-        step_clk();
-
-        // Strobe split boundary
-        cfg_update_strobe = 1;
-        step_clk();
-        cfg_update_strobe = 0;
-        acc_clr = 2'b11;
-        step_clk();
-        acc_clr = 2'b00;
-
-        $display("Dynamic Boundary Split applied at Col %0d (Mask = %b)", HALF_COLS, region_id_mask);
-        $display("Dataflows configured: Region A = WS (00) | Region B = OS (01)");
+        #1;
+        cycle_count = 0;
 
         // -------------------------------------------------------------
         // Concurrent Heterogeneous Multi-Tenant Execution
         // -------------------------------------------------------------
         start_cycle_total = cycle_count;
 
-        // Step 1: Preload stationary weights for Region A (WS)
-        w_ld[0] = 1'b1;
+        // Cycle 1: Strobe split boundary & clear accumulators
+        cfg_update_strobe = 1;
+        acc_clr           = 2'b11;
+        step_clk();
+        cfg_update_strobe = 0;
+        acc_clr           = 2'b00;
+
+        $display("Dynamic Boundary Split applied at Col %0d (Mask = %b)", HALF_COLS, region_id_mask);
+        $display("Dataflows configured: Region A = WS (00) | Region B = OS (01)");
+
+        // Cycle 2: Preload stationary weights for Region A (WS) AND prime hardware lease for both regions
+        // Note: Because lifetime_cnt is 0 before this posedge, mac_en is 0 during this cycle,
+        // so weight preload occurs simultaneously with lease priming without spurious accumulation.
+        w_ld[0]       = 1'b1;
+        lifetime_ld   = 2'b11;
+        lifetime_init = {4'd15, 4'd15};
         for (int r = 0; r < NUM_ROWS; r++) begin
             set_din_w_a(r, cnn_weights_mem[r][0]);
         end
         step_clk();
         w_ld[0] = 1'b0;
-        din_w_region_a = '0;
-        
-        // Clear accumulator so it cleanly accumulates only during execution
-        acc_clr = 2'b11;
-        step_clk();
-        acc_clr = 2'b00;
-        
-        // Prime hardware lease counter so it is active at k=0
-        lifetime_ld   = 2'b11;
-        lifetime_init = {4'd15, 4'd15};
-        step_clk();
 
-        // Step 2: Concurrent streaming execution:
+        // Cycles 3 .. K+2: Concurrent streaming execution (K_STEPS cycles)
         // Region A streams activations from West (WS)
         // Region B streams Q from North and K from West simultaneously (OS)
         for (int k = 0; k < K_STEPS; k++) begin
@@ -254,13 +247,12 @@ module cosim_model3_hdf_tb;
             total_active_macs += (NUM_ROWS * HALF_COLS); // Region A active
             total_active_macs += (NUM_ROWS * HALF_COLS); // Region B active
         end
-        lifetime_ld = 2'b00;
 
-        // Drain 2-stage MAC pipeline registers
-        din_n = '0;
+        // Cycle K+3: Drain final product register into accumulator
+        lifetime_ld    = 2'b00;
+        din_n          = '0;
         din_w_region_a = '0;
         din_w_region_b = '0;
-        step_clk();
         step_clk();
 
         end_cycle_reg_a = cycle_count;
@@ -285,7 +277,7 @@ module cosim_model3_hdf_tb;
         $fwrite(fp, "  \"scale\": \"%s\",\n", `SCALE_NAME);
         $fwrite(fp, "  \"reg_a_cycles\": %0d,\n", (end_cycle_reg_a - start_cycle_total));
         $fwrite(fp, "  \"reg_b_cycles\": %0d,\n", (end_cycle_reg_b - start_cycle_total));
-        $fwrite(fp, "  \"total_makespan_cycles\": %0d,\n", cycle_count);
+        $fwrite(fp, "  \"total_makespan_cycles\": %0d,\n", (end_cycle_reg_b - start_cycle_total));
         $fwrite(fp, "  \"total_valid_macs\": %0d\n", total_active_macs);
         $fwrite(fp, "}\n");
         $fclose(fp);
@@ -294,11 +286,10 @@ module cosim_model3_hdf_tb;
         $display(" [SUMMARY: MODEL 3 POLYFLOW-NPU]");
         $display("   Region A (CNN Native WS) Cycles: %0d", (end_cycle_reg_a - start_cycle_total));
         $display("   Region B (ViT Native OS) Cycles: %0d", (end_cycle_reg_b - start_cycle_total));
-        $display("   Total Co-Run Makespan Cycles:    %0d", cycle_count);
-        $display("   Total Valid MACs:                %0d", total_active_macs);
+        $display("   Total Co-Run Makespan Cycles:    %0d", (end_cycle_reg_b - start_cycle_total));
+        $display("   Total Useful MACs:               %0d", total_active_macs);
         $display("================================================================");
         $finish;
     end
 
 endmodule
-

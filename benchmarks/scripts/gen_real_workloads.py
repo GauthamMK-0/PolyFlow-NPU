@@ -134,11 +134,14 @@ def generate_workloads_for_scale(scale_name, cfg, r50_raw, vit_q_raw, vit_k_raw)
     # --------------------------------------------------------------------------
     # Workload 2: Vision Transformer (ViT-Base) Self-Attention (Q * K^T mapped to OS)
     # Extract real attention queries (Q) and keys (K) from pretrained ViT-Base checkpoint
+    # Q[k] is broadcast across columns so WS-forced baseline (Model 2) and OS (Models 1 & 3)
+    # compute the exact same mathematical attention matrix.
     # --------------------------------------------------------------------------
-    q_slice = vit_q_raw[:k_steps * cols].reshape((k_steps, cols))
-    k_slice = vit_k_raw[:k_steps * rows].reshape((k_steps, rows))
+    q_slice = vit_q_raw[:k_steps]
+    q_int8 = quantize_symmetric_int8(q_slice).reshape((k_steps, 1))
+    vit_q = np.repeat(q_int8, cols, axis=1)
 
-    vit_q = quantize_symmetric_int8(q_slice)
+    k_slice = vit_k_raw[:k_steps * rows].reshape((k_steps, rows))
     vit_k = quantize_symmetric_int8(k_slice)
 
     # Write .mem files for hardware testbenches
