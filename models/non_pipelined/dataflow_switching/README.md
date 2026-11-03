@@ -1,72 +1,85 @@
-# Model 1: Dataflow Switching Architecture
+# Model 1: Single-Tenant Dataflow Switching Architecture (Non-Pipelined Baseline)
 
-## Overview
-This directory contains the standalone **Dataflow Switching Model** (corresponding to **Configuration B** in `evaluation_framework.md` / ReDas-style architecture).
+## 1. Overview
+This directory contains the **Non-Pipelined Combinational Baseline** of the Dataflow Switching Model (corresponding to **Configuration B** in `evaluation_framework.md` / ReDas-style architecture).
 
 ### Architectural Characteristics
 * **Single Tenant:** A single workload occupies the entire physical PE array ($M \times N$).
 * **Runtime Dataflow Reconfiguration:** Allows per-tile switching across three core dataflows:
   1. `2'b00` — **Weight-Stationary (WS):** Best for Convolution and Fully-Connected layers with high filter reuse.
   2. `2'b01` — **Output-Stationary (OS):** Optimal for Self-Attention matrix multiplications ($Q \cdot K^T$ and $S \cdot V$) where both inputs are transient activations.
-  3. `2'b10` — **Input-Stationary (IS):** Optimal for Depthwise-Separable convolutions where activations fan out across multiple filter taps.
-* **No Spatial Fission:** Demonstrates dataflow flexibility in isolation without concurrent multi-tenancy or array partitioning.
+  3. `2'b10` — **Input-Stationary (IS):** Optimal for Depthwise-Separable convolutions.
+* **Single-Cycle Combinational MAC Baseline:** Implements direct multiplication and recursive accumulation in a single clock cycle, serving as the timing and area baseline to highlight the benefits of pipelined carry-save architectures.
 
 ---
 
-## Directory Structure
+## 2. Directory Structure & Partitioned Scaling Layout
 ```
 models/non_pipelined/dataflow_switching/
 ├── rtl/
-│   ├── dfs_pe.sv      # Heterogeneous Processing Element with WS/OS/IS multiplexing
-│   ├── dfs_array.sv   # 2D Systolic Array Grid
-│   └── dfs_top.sv     # Top-level array controller
+│   ├── dfs_pe.sv              # Heterogeneous PE with single-cycle combinational MAC
+│   ├── dfs_array.sv           # 2D Systolic Array Grid
+│   └── dfs_top.sv             # Top-level array controller (4x4 baseline)
 ├── tb/
-│   └── dfs_top_tb.sv  # SystemVerilog testbench validating sequential tile switching
-├── dfs_top.sdc        # SDC timing constraints (200 MHz / 5.000 ns clock target)
-├── synth_dfs.tcl      # Cadence Genus synthesis execution script
-├── Makefile           # Cadence Xcelium & Genus automation
+│   └── dfs_top_tb.sv          # SystemVerilog testbench validating sequential tile switching
+├── reports/                   # Cadence Genus & Innovus synthesis/PnR reports
+│   ├── 4x4/                   # 4x4 baseline reports (timing, area, power, qor, gates)
+│   ├── 8x8/                   # 8x8 scaled pod reports
+│   ├── 16x16/                 # 16x16 full pod reports
+│   └── cts/                   # Clock Tree Synthesis reports
+├── netlist/                   # Gate-level netlists & timing models
+│   ├── 4x4/                   # dfs_top_netlist.v, .sdc, .sdf for 4x4
+│   ├── 8x8/                   # Gate-level netlist for 8x8
+│   └── 16x16/                 # Gate-level netlist for 16x16
+├── output/                    # Simulation executables & waveforms
+│   ├── 4x4/                   # 4x4 simulation outputs (.vvp, .vcd)
+│   ├── 8x8/                   # 8x8 simulation outputs
+│   └── 16x16/                 # 16x16 simulation outputs
+├── outputs/                   # Cadence Innovus physical design signoff deliverables
+│   ├── 4x4/                   # Post-route DEF, netlist, and SDF (4x4)
+│   ├── 8x8/                   # Post-route deliverables (8x8)
+│   └── 16x16/                 # Post-route deliverables (16x16)
+├── db/                        # Cadence Innovus database checkpoints (.enc)
+│   ├── 4x4/                   # Checkpoints from init to postroute (4x4)
+│   ├── 8x8/                   # Checkpoints for 8x8
+│   └── 16x16/                 # Checkpoints for 16x16
+├── dfs_top.sdc                # SDC timing constraints (200 MHz / 5.000 ns clock target)
+├── synth_dfs.tcl              # Multi-scale Cadence Genus synthesis script
+├── pnr_place_dfs.tcl          # Multi-scale Cadence Innovus physical design script
+├── Makefile                   # Automation Makefile for simulation, synthesis, and PnR
 └── README.md
 ```
 
 ---
 
-## Verification & Simulation
-
-### Testbench Architecture (`tb/dfs_top_tb.sv`)
-The self-contained SystemVerilog testbench validates runtime dataflow switching across all three dataflow configurations:
-1. **Weight-Stationary (WS) Mode:** Preloads stationary weights from West port and streams inputs from North port; verifies combinational dot products.
-2. **Output-Stationary (OS) Mode:** Streams queries from North and keys from West simultaneously; verifies combinational dot products.
-3. **Input-Stationary (IS) Mode:** Preloads stationary activations from North port and streams weights from West; verifies combinational dot products.
+## 3. Verification & Simulation
 
 ### Simulation Commands
 ```bash
-cd models/non_pipelined/dataflow_switching
-make run         # Cadence Xcelium simulation (default, headless)
-make gui         # Cadence Xcelium with SimVision GUI
-make iverilog    # Fast simulation using Icarus Verilog (< 1s)
-make verilator   # Cycle-accurate simulation using Verilator
-make lint        # Strict Verilator linting (-Wall --timing)
-make clean       # Clean simulation sandbox and log files
+# Fast Icarus Verilog simulation:
+make test-4x4       # Run 4x4 baseline simulation (output in output/4x4/)
+make iverilog       # Alias to test-4x4
+
+# Cadence Xcelium simulation:
+make run SCALE=4x4  # Headless batch simulation
+make gui SCALE=4x4  # Interactive SimVision GUI mode
+
+# Verilator cycle-accurate simulation:
+make verilator-4x4
+
+# Linting & Cleanup:
+make lint           # Strict Verilator linting (-Wall --timing)
+make clean          # Clean temporary sandbox files without deleting tracked reports
 ```
 
 ---
 
-## ASIC Logic Synthesis & Timing Closure (Cadence Genus @ 200 MHz)
-
-Model 1 baseline is pre-configured for logic synthesis mapped to standard cells (`slow.lib`) using Cadence Genus:
+## 4. ASIC Logic Synthesis & Physical Design (90nm)
 
 ```bash
-cd models/non_pipelined/dataflow_switching
-make synth            # Runs genus with synth_dfs.tcl and dfs_top.sdc
+# Cadence Genus logic synthesis:
+make synth-4x4          # Synthesize 4x4 netlist and reports (reports/4x4/, netlist/4x4/)
+
+# Cadence Innovus physical design:
+make pnr-place-4x4      # Complete PnR flow for 4x4 (outputs in outputs/4x4/, db/4x4/)
 ```
-
-### Synthesis Specifications & Optimizations
-- **Target Frequency**: **200 MHz** ($T_{\text{clk}} = 5.000\text{ ns}$)
-- **I/O Delay Budget**: $0.500\text{ ns}$ (10% of clock period)
-- **Clock Uncertainty**: $0.050\text{ ns}$ (setup margin)
-- **Timing Model**: Pure standard single-cycle synchronous STA across all paths (no false paths or exception paths needed)
-- **Operand MUX Pruning**: Direct wire on `mul_b`, 2:1 MUX on `mul_a`, eliminating 4:1 multiplexer tree delay
-- **Synthesis Effort**: Clean, standard synthesis flow (`syn_generic`, `syn_map`, `syn_opt` at `medium` effort) without artificial datapath sharing or forced flattening
-- **Timing Headroom**: Single-cycle datapath achieves robust positive setup slack ($\ge +1.5\text{ ns}$) across all paths
-
-

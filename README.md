@@ -34,7 +34,7 @@ Each dynamically partitioned region independently selects its mathematically opt
 In conventional single-cycle systolic PEs, recursive 32-bit accumulation after an 8x8 multiplier creates a critical delay path exceeding 4.2 ns in 90nm bulk CMOS. PolyFlow-NPU eliminates this bottleneck:
 1. **Stage 1 (Multiply and Register):** Multiplies runtime-selected operands (`mul_a * mul_b`) and latches the 16-bit signed product into `product_reg`.
 2. **Stage 2 (Redundant Carry-Save Accumulator):** Accumulation loop operates on two redundant 32-bit state vectors (`acc_sum` and `acc_carry`) using parallel 3:2 full adder compressors.
-   - **O(1) Gate Delay:** Carry rippling is completely eliminated from the inner feedback loop (~0.15 ns full adder delay).
+   - **$O(1)$ Gate Delay:** Carry rippling is completely eliminated from the inner feedback loop (~0.15 ns full adder delay).
    - **Readout Resolution:** Full carry propagation (`acc_out = acc_sum + acc_carry`) is deferred to final tile readout outside the high-frequency clock path, achieving **+1.200 ns positive setup slack** at 200 MHz in Cadence Innovus ($f_{\text{max}} \approx 263.2\text{ MHz}$).
 
 ### 2.2 Dynamic Spatial Fission and Boundary Isolation
@@ -62,6 +62,8 @@ To benchmark each contribution systematically, this repository provides three se
 | [**models/pipelined/spatial_fission/**](models/pipelined/spatial_fission) | **Configuration A** (Planaria Baseline) | Multi-Tenant (Region A + B) | Rigidly Locked to WS | Concurrent CNN workloads |
 | [**models/pipelined/heterogeneous_fission/**](models/pipelined/heterogeneous_fission) | **Configuration C** (Novel Proposed Idea) | **Multi-Tenant (Region A + B)** | **Independent Runtime WS / OS / IS** | **Simultaneous CNN (WS) + Transformer (OS) co-execution** |
 
+*(Non-pipelined combinational MAC baselines are likewise provided in [models/non_pipelined/](models/non_pipelined/) for timing and area reference.)*
+
 ---
 
 ## 4. Scalable Systolic Array Exploration (4x4, 8x8, 16x16)
@@ -82,7 +84,9 @@ All three models feature standalone top wrappers and testbenches across three ar
 
 ---
 
-## 5. Repository Directory Structure
+## 5. Repository Directory Structure & Scale Partitioning
+
+All simulation outputs, logic synthesis reports, gate-level netlists, and physical design deliverables are strictly partitioned into scale-specific directories (`4x4/`, `8x8/`, `16x16/`):
 
 ```
 mt_npu/
@@ -94,26 +98,27 @@ mt_npu/
 │   └── figC_hetero_fission.png           # Configuration C: Heterogeneous Fission Pod
 │
 ├── models/                               # Architectural exploration models
-│   ├── common.mk                         # Unified compilation, simulation and synthesis make rules
+│   ├── common.mk                         # Unified scaling-aware make rules
 │   │
 │   ├── pipelined/                        # [Pipelined Models] Two-Stage MAC + Carry-Save Accumulator
 │   │   ├── dataflow_switching/           # Model 1: Single-tenant runtime WS/OS/IS switching
-│   │   │   ├── rtl/                      # dfs_pe.sv, dfs_array.sv, dfs_top.sv, dfs_top_8x8.sv, dfs_top_16x16.sv
-│   │   │   ├── tb/                       # dfs_top_tb.sv, dfs_top_8x8_tb.sv, dfs_top_16x16_tb.sv
-│   │   │   └── Makefile                  # Compilation and synthesis targets
-│   │   │
 │   │   ├── spatial_fission/              # Model 2: Homogeneous spatial multi-tenancy
-│   │   │   ├── rtl/                      # sfa_pe.sv, sfa_array.sv, sfa_top.sv, sfa_top_8x8.sv, sfa_top_16x16.sv
-│   │   │   ├── tb/                       # sfa_top_tb.sv, sfa_top_8x8_tb.sv, sfa_top_16x16_tb.sv
-│   │   │   └── Makefile                  # Compilation and synthesis targets
-│   │   │
 │   │   └── heterogeneous_fission/        # Model 3: Heterogeneous Fission (PolyFlow-NPU)
-│   │       ├── rtl/                      # hdf_pe.sv, hdf_array_grid.sv, hdf_top.sv, hdf_top_8x8.sv, hdf_top_16x16.sv,
-│   │       │                             # eppa_arbiter.sv, otp_token_fsm.sv, pod_bank_scrub.sv
-│   │       ├── tb/                       # hdf_top_tb.sv, hdf_top_8x8_tb.sv, hdf_top_16x16_tb.sv
-│   │       └── Makefile                  # Compilation and synthesis targets
+│   │       ├── rtl/                      # Parameterized RTL + standalone 8x8 & 16x16 wrappers
+│   │       ├── tb/                       # Scale-specific testbenches (4x4, 8x8, 16x16)
+│   │       ├── reports/{4x4,8x8,16x16}/  # Partitioned Genus synthesis & Innovus reports
+│   │       ├── netlist/{4x4,8x8,16x16}/  # Gate-level netlists (.v), SDC, SDF
+│   │       ├── output/{4x4,8x8,16x16}/   # Simulation executables & waveforms
+│   │       ├── outputs/{4x4,8x8,16x16}/  # Innovus postroute DEF, netlist, SDF deliverables
+│   │       ├── db/{4x4,8x8,16x16}/       # Innovus design database checkpoints (.enc)
+│   │       ├── synth_hdf.tcl             # Multi-scale Cadence Genus synthesis script
+│   │       ├── pnr_place_hdf.tcl         # Multi-scale Cadence Innovus PnR script
+│   │       └── Makefile                  # Model Makefile
 │   │
-│   └── non_pipelined/                    # [Non-Pipelined Models] Combinational MAC baselines
+│   └── non_pipelined/                    # [Non-Pipelined Models] Single-cycle combinational MAC
+│       ├── dataflow_switching/
+│       ├── spatial_fission/
+│       └── heterogeneous_fission/
 │
 ├── scripts/
 │   ├── run_all_models.sh                 # Unified regression runner (supports 4x4, 8x8, 16x16, all)
@@ -121,9 +126,9 @@ mt_npu/
 │   ├── cts.tcl                           # Clock Tree Synthesis (CCOpt) configuration
 │   └── viewDefinition.tcl                # MMMC timing analysis view definitions
 │
-├── local/                                # Private scratchpads, reports, and presentations (gitignored)
+├── local/                                # Scratchpads, logs, and IEEE-format LaTeX diagrams (gitignored)
 ├── Makefile                              # Top-level master automation Makefile
-├── .gitignore                            # Excludes logs, simulation sandboxes, and local documents
+├── .gitignore                            # Excludes build sandboxes while tracking deliverables
 └── README.md                             # Global repository documentation (this file)
 ```
 
@@ -139,9 +144,9 @@ Run cycle-accurate SystemVerilog testbenches verifying corner PEs, boundary isol
 make test-scaling-all
 
 # Or verify a specific array size across all 3 models:
-make test-4x4-all           # All models at 4x4 (16 PEs each)
-make test-8x8-all           # All models at 8x8 (64 PEs each)
-make test-16x16-all         # All models at 16x16 (256 PEs each)
+make test-4x4-all           # All models at 4x4 (16 PEs each) -> output in output/4x4/
+make test-8x8-all           # All models at 8x8 (64 PEs each) -> output in output/8x8/
+make test-16x16-all         # All models at 16x16 (256 PEs each) -> output in output/16x16/
 
 # Or verify individual models across all sizes:
 make test-scaling-model1    # Dataflow Switching (4x4, 8x8, 16x16)
@@ -160,6 +165,9 @@ make test-scaling           # All 3 sizes for this model
 The unified test runner supports automated regression reporting across tools, variants, and scales:
 
 ```bash
+# Run baseline 4x4 regression:
+./scripts/run_all_models.sh iverilog pipelined 4x4
+
 # Run 8x8 scaled pod regression:
 ./scripts/run_all_models.sh iverilog pipelined 8x8
 
@@ -168,18 +176,15 @@ The unified test runner supports automated regression reporting across tools, va
 
 # Run complete scaling regression across all sizes:
 ./scripts/run_all_models.sh iverilog pipelined all
-
-# Run baseline 4x4 regression:
-./scripts/run_all_models.sh iverilog pipelined 4x4
 ```
 
 ### 6.3 Cadence Xcelium Simulation
 ```bash
 # Headless batch mode:
-make run-model1
-make run-model2
-make run-model3
-make run-all
+make run-model1 SCALE=4x4
+make run-model2 SCALE=8x8
+make run-model3 SCALE=16x16
+make run-all    SCALE=4x4
 
 # Interactive SimVision GUI mode:
 make gui-model3
@@ -187,9 +192,9 @@ make gui-model3
 
 ### 6.4 Verilator Cycle Simulation
 ```bash
-make verilator-model1
-make verilator-model2
-make verilator-model3
+make verilator-model1 SCALE=4x4
+make verilator-model2 SCALE=8x8
+make verilator-model3 SCALE=16x16
 ```
 
 ---
@@ -198,25 +203,42 @@ make verilator-model3
 
 The designs are synthesized and placed-and-routed using **Cadence Genus Synthesis Solution** and **Cadence Innovus Implementation System** targeting a 90nm bulk CMOS standard-cell library (`slow.lib` / `fast.lib` MMMC corners):
 
-### 7.1 Logic Synthesis (Cadence Genus)
+### 7.1 Multi-Scale Logic Synthesis (Cadence Genus)
+Reports land cleanly inside `reports/${SCALE}/` and gate-level netlists in `netlist/${SCALE}/`:
+
 ```bash
-make synth-model1           # Synthesizes Model 1 (dataflow switching)
-make synth-model2           # Synthesizes Model 2 (spatial fission)
-make synth-model3           # Synthesizes Model 3 (heterogeneous fission)
-make synth-all              # Synthesizes all 3 models sequentially
+# Synthesize all models for a specific scale:
+make synth-4x4-all          # 4x4 baseline synthesis across all 3 models
+make synth-8x8-all          # 8x8 scaled pod synthesis across all 3 models
+make synth-16x16-all        # 16x16 full pod synthesis across all 3 models
+make synth-scaling-all      # Synthesize all models across 4x4, 8x8, and 16x16
+
+# Or synthesize individual models:
+make synth-model1 SCALE=4x4
+make synth-model2 SCALE=8x8
+make synth-model3 SCALE=16x16
 ```
 
 - **Timing Constraints:** Target clock period $T_{\text{clk}} = 5.000\text{ ns}$ (200 MHz), clock uncertainty 0.050 ns, input/output delay 0.500 ns.
-- **Multicycle Paths:** Configured for dispatch-time configuration registers (`region_id_mask`).
+- **Reports Generated:** `timing_*.rpt`, `power_*.rpt`, `area_*.rpt`, `qor_*.rpt`, `gates_*.rpt`.
 
-### 7.2 Physical Design: Place-and-Route (Cadence Innovus)
+### 7.2 Multi-Scale Physical Design: Place-and-Route (Cadence Innovus)
+PnR deliverables land in `outputs/${SCALE}/`, database checkpoints in `db/${SCALE}/`, and CTS reports in `reports/${SCALE}/cts/`:
+
 ```bash
-make pnr-place-model1       # Floorplan, power routing, placement, CTS, and routing
-make pnr-place-model2
-make pnr-place-model3
-make pnr-place-all
+# Run Innovus placement & routing across all models for a specific scale:
+make pnr-place-4x4-all      # 4x4 PnR across all 3 models
+make pnr-place-8x8-all      # 8x8 PnR across all 3 models
+make pnr-place-16x16-all    # 16x16 PnR across all 3 models
+make pnr-place-scaling-all  # PnR across all scales and all models
+
+# Or run Innovus on individual models:
+make pnr-place-model1 SCALE=4x4
+make pnr-place-model2 SCALE=8x8
+make pnr-place-model3 SCALE=16x16
 ```
 
 - **Technology and Metal Stack:** Standard 90nm 7-metal grid (`M1` to `M7`), `gsclib090site` core site.
-- **Clock Tree Synthesis (CCOpt):** Balanced clock DAG with 15 clock buffers, zero clock gating violations, and target insertion delay < 0.65 ns.
-- **Post-Route Timing Slack:** Achieves **+1.200 ns setup slack** ($f_{\text{max}} \approx 263.2\text{ MHz}$) due to the two-stage pipelined datapath and redundant carry-save accumulator.
+- **Clock Tree Synthesis (CCOpt):** Balanced clock DAG with non-default routing rules (`2w2s`), zero clock gating violations, and target insertion delay < 0.65 ns.
+- **Post-Route Deliverables:** Placed & routed DEF (`outputs/${SCALE}/*_postroute.def`), signoff netlists (`*_postroute.v`), SDF files (`*_postroute.sdf`), DRC (`*_postroute_drc.rpt`), and connectivity reports.
+- **Timing Closure:** Achieves **+1.200 ns positive setup slack** ($f_{\text{max}} \approx 263.2\text{ MHz}$) at 200 MHz due to the two-stage pipelined datapath and carry-save accumulator.
