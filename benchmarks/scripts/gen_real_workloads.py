@@ -118,31 +118,26 @@ def generate_workloads_for_scale(scale_name, cfg, r50_raw, vit_q_raw, vit_k_raw)
 
     # --------------------------------------------------------------------------
     # Workload 1: ResNet-50 Real Weights & Activations (Conv2D layer mapped to WS)
-    # Extract real weights slice from pretrained ResNet-50 checkpoint
+    # Extract distinct real weights for each PE(r, c) from pretrained checkpoint
     # --------------------------------------------------------------------------
-    r50_slice = r50_raw[:rows]
-    r50_int8 = quantize_symmetric_int8(r50_slice).reshape((rows, 1))
-    cnn_weights = np.repeat(r50_int8, cols, axis=1)
+    num_pe_weights = rows * cols
+    r50_slice = r50_raw[:num_pe_weights]
+    cnn_weights = quantize_symmetric_int8(r50_slice).reshape((rows, cols))
 
-    # Real activations: Post-ReLU activation features derived from convolution responses
-    # Clipped to positive INT8 [0, 127]
+    # Real activations: derived from convolution response distributions
+    # Realistic positive INT8 activations [1, 127]
     np.random.seed(rows * 100 + cols)
-    r50_act_seed = np.abs(r50_raw[100:100 + k_steps * rows])
-    r50_act_slice = r50_act_seed.reshape((k_steps, rows))
-    cnn_inputs = np.clip(np.round(r50_act_slice * 80.0), 0, 127).astype(np.int8)
+    r50_act_seed = np.abs(r50_raw[500:500 + k_steps * rows])
+    cnn_inputs = quantize_symmetric_int8(r50_act_seed).reshape((k_steps, rows))
+    cnn_inputs = np.clip(np.abs(cnn_inputs) + 1, 1, 127).astype(np.int8)
 
     # --------------------------------------------------------------------------
     # Workload 2: Vision Transformer (ViT-Base) Self-Attention (Q * K^T mapped to OS)
-    # Extract real attention queries (Q) and keys (K) from pretrained ViT-Base checkpoint
-    # Q[k] is broadcast across columns so WS-forced baseline (Model 2) and OS (Models 1 & 3)
-    # compute the exact same mathematical attention matrix.
+    # Extract real attention queries (Q) and keys (K) from pretrained ViT checkpoint
+    # Q has distinct values for each column; K has distinct values for each row
     # --------------------------------------------------------------------------
-    q_slice = vit_q_raw[:k_steps]
-    q_int8 = quantize_symmetric_int8(q_slice).reshape((k_steps, 1))
-    vit_q = np.repeat(q_int8, cols, axis=1)
-
-    k_slice = vit_k_raw[:k_steps * rows].reshape((k_steps, rows))
-    vit_k = quantize_symmetric_int8(k_slice)
+    vit_q = quantize_symmetric_int8(vit_q_raw[:k_steps * cols]).reshape((k_steps, cols))
+    vit_k = quantize_symmetric_int8(vit_k_raw[:k_steps * rows]).reshape((k_steps, rows))
 
     # Write .mem files for hardware testbenches
     write_mem_file(os.path.join(data_dir, "cnn_weights.mem"), cnn_weights)
@@ -157,20 +152,15 @@ def generate_workloads_for_scale(scale_name, cfg, r50_raw, vit_q_raw, vit_k_raw)
     # Acc[r][c] = sum_k (cnn_inputs[k][r] * cnn_weights[r][c])
     golden_m1_cnn = np.zeros((rows, cols), dtype=np.int32)
     for r in range(rows):
-        prod_sum = int(0)
-        for k in range(k_steps):
-            prod_sum += int(cnn_inputs[k, r]) * int(cnn_weights[r, 0])
-        golden_m1_cnn[r, :] = prod_sum
+        for c in range(cols):
+            golden_m1_cnn[r, c] = int(np.sum(cnn_inputs[:, r].astype(np.int32) * int(cnn_weights[r, c])))
 
     # 2. Full-array ViT Attention Solo (Model 1 OS):
-    # Acc[r][c] = sum_k (vit_q[k][c] * vit_k[k][r])
+    # Acc[r][c] = sum_k (vit_k[k][r] * vit_q[k][c]) = (K^T * Q)[r, c]
     golden_m1_vit = np.zeros((rows, cols), dtype=np.int32)
     for r in range(rows):
         for c in range(cols):
-            prod_sum = int(0)
-            for k in range(k_steps):
-                prod_sum += int(vit_q[k, c]) * int(vit_k[k, r])
-            golden_m1_vit[r, c] = prod_sum
+            golden_m1_vit[r, c] = int(np.sum(vit_k[:, r].astype(np.int32) * vit_q[:, c].astype(np.int32)))
 
     # 3. Multi-Tenant Concurrent Execution (Model 2 & Model 3):
     # Region A (Cols 0 .. half_cols-1): Real CNN Workload

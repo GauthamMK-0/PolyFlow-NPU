@@ -137,24 +137,24 @@ module cosim_model1_dfs_tb;
         step_clk();
         tile_acc_clr      = 0;
 
-        // Cycle 2: Preload stationary weights for row r
+        // Preload stationary weights: shift West-to-East across all NUM_COLS columns
         tile_w_ld = 1;
-        for (int r = 0; r < NUM_ROWS; r++) begin
-            set_din_w(r, cnn_weights_mem[r][0]);
+        for (int step = NUM_COLS - 1; step >= 0; step--) begin
+            for (int r = 0; r < NUM_ROWS; r++) begin
+                set_din_w(r, cnn_weights_mem[r][step]);
+            end
+            step_clk();
         end
-        step_clk();
         tile_w_ld = 0;
 
-        // Cycles 3 .. K+2: Stream CNN activations (K_STEPS cycles)
-        // Note: Tenant A requires NUM_ROWS x HALF_COLS outputs; the other HALF_COLS
-        // cannot be assigned to Tenant B because Model 1 is monolithic.
+        // Stream CNN activations across all rows (K_STEPS cycles)
         tile_compute_en = 1;
         for (int k = 0; k < K_STEPS; k++) begin
             for (int r = 0; r < NUM_ROWS; r++) begin
                 set_din_w(r, cnn_inputs_mem[k][r]);
             end
             step_clk();
-            total_active_macs += (NUM_ROWS * HALF_COLS);
+            total_active_macs += (NUM_ROWS * NUM_COLS);
         end
 
         // Cycle K+3: Drain final product register into accumulator
@@ -197,7 +197,7 @@ module cosim_model1_dfs_tb;
                 set_din_w(r, vit_k_mem[k][r]);
             end
             step_clk();
-            total_active_macs += (NUM_ROWS * HALF_COLS);
+            total_active_macs += (NUM_ROWS * NUM_COLS);
         end
 
         // Cycle K+2: Drain final product register into accumulator

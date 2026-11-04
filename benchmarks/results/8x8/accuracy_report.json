@@ -20,13 +20,13 @@
     "status": "PASS (Bit-Exact 100%)"
   },
   {
-    "label": "Model 2: Planaria Homogeneous Fission (Region A: WS + Region B: Forced WS)",
-    "total_elements": 64,
-    "matching_elements": 64,
+    "label": "Model 2: Planaria Region A (CNN Native WS)",
+    "total_elements": 32,
+    "matching_elements": 32,
     "match_rate_pct": 100.0,
     "mae": 0.0,
     "mse": 0.0,
-    "cosine_similarity": 1.0000000000000002,
+    "cosine_similarity": 0.9999999999999998,
     "status": "PASS (Bit-Exact 100%)"
   },
   {

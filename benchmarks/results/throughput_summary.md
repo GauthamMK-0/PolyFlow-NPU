@@ -10,23 +10,23 @@
 
 | Scale | Metric | Model 1: Sequential (ReDas) | Model 2: Homog. Fission (Planaria) | Model 3: PolyFlow-NPU (Proposed) | PolyFlow Win vs. Baselines |
 | :---: | :--- | :---: | :---: | :---: | :--- |
-| **4x4** (16 PEs) | **Makespan (cycles)** | 37 cyc | 34 cyc | **19 cyc** | **1.95× vs M1** / **1.79× vs M2** |
-| | **Execution Time (@ 200 MHz)** | 0.18 $\mu\text{s}$ | 0.17 $\mu\text{s}$ | **0.10 $\mu\text{s}$** | **48.6% Latency Reduction** |
-| | **Sustained Throughput** | 2.77 GOPS | 3.01 GOPS | **5.39 GOPS** | **Peak: 6.40 GOPS** |
-| | **PE Compute Utilization ($U_{\text{PE}}$)** | 43.2% | 47.1% | **84.2%** | **+37.2% Utilization Gain** |
-| | **Multi-Tenant Weighted Speedup ($WS$)** | 1.00× | 1.53× | **1.95×** | **Near-linear parallel scaling** |
+| **4x4** (16 PEs) | **Makespan (cycles)** | 40 cyc | 36 cyc | **20 cyc** | **2.00× vs M1** / **1.80× vs M2** |
+| | **Execution Time (@ 200 MHz)** | 0.20 $\mu\text{s}$ | 0.18 $\mu\text{s}$ | **0.10 $\mu\text{s}$** | **50.0% Latency Reduction** |
+| | **Sustained Throughput** | 5.12 GOPS | 2.84 GOPS | **5.12 GOPS** | **Peak: 6.40 GOPS** |
+| | **PE Compute Utilization ($U_{\text{PE}}$)** | 80.0% | 44.4% | **80.0%** | **+35.6% Utilization Gain** |
+| | **Multi-Tenant Weighted Speedup ($WS$)** | 1.45× | 1.66× | **2.00×** | **Near-linear parallel scaling** |
 | :---: | :--- | :---: | :---: | :---: | :--- |
-| **8x8** (64 PEs) | **Makespan (cycles)** | 69 cyc | 66 cyc | **35 cyc** | **1.97× vs M1** / **1.89× vs M2** |
-| | **Execution Time (@ 200 MHz)** | 0.34 $\mu\text{s}$ | 0.33 $\mu\text{s}$ | **0.17 $\mu\text{s}$** | **49.3% Latency Reduction** |
-| | **Sustained Throughput** | 11.87 GOPS | 12.41 GOPS | **23.41 GOPS** | **Peak: 25.60 GOPS** |
-| | **PE Compute Utilization ($U_{\text{PE}}$)** | 46.4% | 48.5% | **91.4%** | **+42.9% Utilization Gain** |
-| | **Multi-Tenant Weighted Speedup ($WS$)** | 1.00× | 1.52× | **1.97×** | **Near-linear parallel scaling** |
+| **8x8** (64 PEs) | **Makespan (cycles)** | 76 cyc | 70 cyc | **38 cyc** | **2.00× vs M1** / **1.84× vs M2** |
+| | **Execution Time (@ 200 MHz)** | 0.38 $\mu\text{s}$ | 0.35 $\mu\text{s}$ | **0.19 $\mu\text{s}$** | **50.0% Latency Reduction** |
+| | **Sustained Throughput** | 21.56 GOPS | 11.70 GOPS | **21.56 GOPS** | **Peak: 25.60 GOPS** |
+| | **PE Compute Utilization ($U_{\text{PE}}$)** | 84.2% | 45.7% | **84.2%** | **+38.5% Utilization Gain** |
+| | **Multi-Tenant Weighted Speedup ($WS$)** | 1.45× | 1.62× | **2.00×** | **Near-linear parallel scaling** |
 | :---: | :--- | :---: | :---: | :---: | :--- |
-| **16x16** (256 PEs) | **Makespan (cycles)** | 133 cyc | 130 cyc | **67 cyc** | **1.99× vs M1** / **1.94× vs M2** |
-| | **Execution Time (@ 200 MHz)** | 0.67 $\mu\text{s}$ | 0.65 $\mu\text{s}$ | **0.34 $\mu\text{s}$** | **49.6% Latency Reduction** |
-| | **Sustained Throughput** | 49.28 GOPS | 50.41 GOPS | **97.81 GOPS** | **Peak: 102.40 GOPS** |
-| | **PE Compute Utilization ($U_{\text{PE}}$)** | 48.1% | 49.2% | **95.5%** | **+46.3% Utilization Gain** |
-| | **Multi-Tenant Weighted Speedup ($WS$)** | 1.00× | 1.51× | **1.99×** | **Near-linear parallel scaling** |
+| **16x16** (256 PEs) | **Makespan (cycles)** | 148 cyc | 138 cyc | **74 cyc** | **2.00× vs M1** / **1.86× vs M2** |
+| | **Execution Time (@ 200 MHz)** | 0.74 $\mu\text{s}$ | 0.69 $\mu\text{s}$ | **0.37 $\mu\text{s}$** | **50.0% Latency Reduction** |
+| | **Sustained Throughput** | 88.56 GOPS | 47.49 GOPS | **88.56 GOPS** | **Peak: 102.40 GOPS** |
+| | **PE Compute Utilization ($U_{\text{PE}}$)** | 86.5% | 46.4% | **86.5%** | **+40.1% Utilization Gain** |
+| | **Multi-Tenant Weighted Speedup ($WS$)** | 1.45× | 1.60× | **2.00×** | **Near-linear parallel scaling** |
 | :---: | :--- | :---: | :---: | :---: | :--- |
 
 ## 2. Key Microarchitectural Findings

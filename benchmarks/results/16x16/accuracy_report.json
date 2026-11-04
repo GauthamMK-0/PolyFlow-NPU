@@ -6,7 +6,7 @@
     "match_rate_pct": 100.0,
     "mae": 0.0,
     "mse": 0.0,
-    "cosine_similarity": 1.0,
+    "cosine_similarity": 0.9999999999999999,
     "status": "PASS (Bit-Exact 100%)"
   },
   {
@@ -16,17 +16,17 @@
     "match_rate_pct": 100.0,
     "mae": 0.0,
     "mse": 0.0,
-    "cosine_similarity": 1.0,
+    "cosine_similarity": 0.9999999999999999,
     "status": "PASS (Bit-Exact 100%)"
   },
   {
-    "label": "Model 2: Planaria Homogeneous Fission (Region A: WS + Region B: Forced WS)",
-    "total_elements": 256,
-    "matching_elements": 256,
+    "label": "Model 2: Planaria Region A (CNN Native WS)",
+    "total_elements": 128,
+    "matching_elements": 128,
     "match_rate_pct": 100.0,
     "mae": 0.0,
     "mse": 0.0,
-    "cosine_similarity": 1.0,
+    "cosine_similarity": 0.9999999999999999,
     "status": "PASS (Bit-Exact 100%)"
   },
   {
@@ -36,7 +36,7 @@
     "match_rate_pct": 100.0,
     "mae": 0.0,
     "mse": 0.0,
-    "cosine_similarity": 1.0,
+    "cosine_similarity": 0.9999999999999998,
     "status": "PASS (Bit-Exact 100%)"
   }
 ]

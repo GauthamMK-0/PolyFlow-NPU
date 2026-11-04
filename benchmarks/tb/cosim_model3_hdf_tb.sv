@@ -218,24 +218,22 @@ module cosim_model3_hdf_tb;
         $display("Dynamic Boundary Split applied at Col %0d (Mask = %b)", HALF_COLS, region_id_mask);
         $display("Dataflows configured: Region A = WS (00) | Region B = OS (01)");
 
-        // Cycle 2: Preload stationary weights for Region A (WS) AND prime hardware lease for both regions
-        // Note: Because lifetime_cnt is 0 before this posedge, mac_en is 0 during this cycle,
-        // so weight preload occurs simultaneously with lease priming without spurious accumulation.
-        w_ld[0]       = 1'b1;
-        lifetime_ld   = 2'b11;
-        lifetime_init = {4'd15, 4'd15};
-        for (int r = 0; r < NUM_ROWS; r++) begin
-            set_din_w_a(r, cnn_weights_mem[r][0]);
+        // Preload stationary weights for Region A (WS): shift West-to-East across Region A columns
+        w_ld[0]     = 1'b1;
+        for (int step = HALF_COLS - 1; step >= 0; step--) begin
+            for (int r = 0; r < NUM_ROWS; r++) begin
+                set_din_w_a(r, cnn_weights_mem[r][step]);
+            end
+            step_clk();
         end
-        step_clk();
         w_ld[0] = 1'b0;
 
-        // Cycles 3 .. K+2: Concurrent streaming execution (K_STEPS cycles)
+        // Concurrent streaming execution (K_STEPS cycles)
         // Region A streams activations from West (WS)
         // Region B streams Q from North and K from West simultaneously (OS)
+        lifetime_ld   = 2'b11;
+        lifetime_init = {8'd255, 8'd255};
         for (int k = 0; k < K_STEPS; k++) begin
-            lifetime_ld   = 2'b11;
-            lifetime_init = {4'd15, 4'd15}; // Maintain active hardware lease
             for (int r = 0; r < NUM_ROWS; r++) begin
                 set_din_w_a(r, cnn_inputs_mem[k][r]);
                 set_din_w_b(r, vit_k_mem[k][r]); // K into Region B

@@ -112,7 +112,8 @@ def run_benchmark_for_scale(scale_name):
 
     # Multi-tenant Weighted Speedup
     # WS = (T_cnn_solo / T_regA) + (T_vit_solo / T_regB)
-    ws_m1 = 1.00 # Serial baseline definition
+    # For Model 1 (Sequential), Tenant A finishes at t_cnn_solo, Tenant B finishes at t_m1:
+    ws_m1 = 1.0 + (t_vit_solo / t_m1)
     ws_m2 = (t_cnn_solo / m2["reg_a_cycles"]) + (t_vit_solo / m2["reg_b_cycles"])
     ws_m3 = (t_cnn_solo / m3["reg_a_cycles"]) + (t_vit_solo / m3["reg_b_cycles"])
 

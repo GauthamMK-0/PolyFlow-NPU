@@ -1,8 +1,8 @@
 {
   "model": "Model 2 (Homogeneous Spatial Fission)",
   "scale": "8x8",
-  "reg_a_cycles": 35,
-  "reg_b_cycles": 66,
-  "total_makespan_cycles": 66,
+  "reg_a_cycles": 37,
+  "reg_b_cycles": 70,
+  "total_makespan_cycles": 70,
   "total_valid_macs": 2048
 }

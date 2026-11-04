@@ -209,27 +209,35 @@ module cosim_model2_sfa_tb;
 
         $display("Dynamic Boundary Split applied at Col %0d (Mask = %b)", HALF_COLS, region_id_mask);
 
-        // Cycles 2 .. 2K+1: Execute Region A (finishes at t = K+1) and Region B (finishes at t = 2K) concurrently
+        // Preload stationary CNN weights for Region A: shift West-to-East across Region A columns
+        w_ld[0]       = 1'b1;
+        compute_en[0] = 1'b0;
+        for (int step = HALF_COLS - 1; step >= 0; step--) begin
+            for (int r = 0; r < NUM_ROWS; r++) begin
+                set_din_w_a(r, cnn_weights_mem[r][step]);
+            end
+            step_clk();
+        end
+        w_ld[0] = 1'b0;
+
+        // Cycles: Execute Region A (CNN in Native WS) and Region B (ViT Attention Forced into WS)
         for (int t = 0; t < 2 * K_STEPS; t++) begin
             // --- Region A (CNN in Native WS) ---
-            if (t == 0) begin
-                // Preload stationary CNN weights
-                w_ld[0]       = 1'b1;
-                compute_en[0] = 1'b0;
-                for (int r = 0; r < NUM_ROWS; r++) begin
-                    set_din_w_a(r, cnn_weights_mem[r][0]);
-                end
-            end else if (t >= 1 && t <= K_STEPS) begin
+            if (t < K_STEPS) begin
                 // Stream K_STEPS CNN activations
-                w_ld[0]       = 1'b0;
                 compute_en[0] = 1'b1;
                 for (int r = 0; r < NUM_ROWS; r++) begin
-                    set_din_w_a(r, cnn_inputs_mem[t-1][r]);
+                    set_din_w_a(r, cnn_inputs_mem[t][r]);
                 end
                 total_active_macs += (NUM_ROWS * HALF_COLS);
+            end else if (t == K_STEPS) begin
+                // Region A drain pipeline stage
+                compute_en[0]  = 1'b0;
+                din_w_region_a = '0;
+                end_cycle_reg_a = cycle_count;
+                $display("Region A (CNN Native WS) Completed: %0d cycles", (end_cycle_reg_a - start_cycle_total));
             end else begin
-                // Region A drain & idle while waiting for Region B
-                w_ld[0]        = 1'b0;
+                // Region A idle while waiting for Region B
                 compute_en[0]  = 1'b0;
                 din_w_region_a = '0;
             end
@@ -247,18 +255,12 @@ module cosim_model2_sfa_tb;
                 w_ld[1]       = 1'b0;
                 compute_en[1] = 1'b1;
                 for (int r = 0; r < NUM_ROWS; r++) begin
-                    set_din_w_b(r, vit_q_mem[t/2][0]);
+                    set_din_w_b(r, vit_q_mem[t/2][HALF_COLS]);
                 end
                 total_active_macs += (NUM_ROWS * HALF_COLS);
             end
 
             step_clk();
-
-            // Record exact cycle when Region A finishes its 1-cycle pipeline drain (at end of t == K_STEPS + 1)
-            if (t == K_STEPS + 1) begin
-                end_cycle_reg_a = cycle_count;
-                $display("Region A (CNN Native WS) Completed: %0d cycles", (end_cycle_reg_a - start_cycle_total));
-            end
         end
 
         // Final 1-cycle pipeline drain for Region B's last product (t = 2K-1)
