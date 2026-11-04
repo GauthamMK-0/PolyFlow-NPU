@@ -83,6 +83,8 @@ module dfs_top_8x8_tb;
         step_clk();
     endtask
 
+    logic signed [ACC_W-1:0] exp_val;
+
     initial begin
         $display("================================================================");
         $display(" [TESTSUITE] Starting 8x8 Scaled Dataflow Switching Pod Tests");
@@ -97,25 +99,36 @@ module dfs_top_8x8_tb;
         step_clk();
         tile_acc_clr      = 0;
 
-        // Preload stationary weights from West
+        // Preload stationary weights: shift West-to-East across all NUM_COLS columns
         tile_w_ld = 1;
-        for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd5);
-        step_clk();
+        for (int step = NUM_COLS - 1; step >= 0; step--) begin
+            for (int r = 0; r < NUM_ROWS; r++) begin
+                set_din_w(r, 8'd5 + step[7:0]);
+            end
+            step_clk();
+        end
         tile_w_ld = 0;
 
-        // Stream activations through West over 4 cycles: 4 * (5 * 3) = 60
+        // Stream activations through West over 4 cycles: 4 * ((5 + c) * 3) = 12 * (5 + c)
         tile_compute_en = 1;
         for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd3);
         repeat (4) step_clk();
         tile_compute_en = 0;
         step_clk(); // Drain pipeline stage
 
-        $display("8x8 WS Mode: PE[0][0] = %0d, PE[7][0] = %0d (Expected: 60)", get_pe_acc(0,0), get_pe_acc(7,0));
-        if (get_pe_acc(0,0) !== 32'd60 || get_pe_acc(7,0) !== 32'd60) begin
-            $display("ERROR: 8x8 WS Mode mismatch!");
-            error_count++;
-        end else begin
-            $display("PASS: 8x8 WS Mode verified successfully across rows.");
+        $display("8x8 WS Mode: PE[0][0] = %0d, PE[7][7] = %0d (Expected: %0d, %0d)",
+                 get_pe_acc(0,0), get_pe_acc(7,7), 12*(5+0), 12*(5+7));
+        for (int r = 0; r < NUM_ROWS; r++) begin
+            for (int c = 0; c < NUM_COLS; c++) begin
+                exp_val = 32'd12 * (32'd5 + c);
+                if (get_pe_acc(r, c) !== exp_val) begin
+                    $display("ERROR: 8x8 WS Mode mismatch at PE[%0d][%0d]!", r, c);
+                    error_count++;
+                end
+            end
+        end
+        if (error_count == 0) begin
+            $display("PASS: 8x8 WS Mode verified successfully across all 64 PEs.");
         end
 
         // TEST 2: Output-Stationary (OS) Mode

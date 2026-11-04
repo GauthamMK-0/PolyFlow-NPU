@@ -149,7 +149,7 @@ lint-verilator:
 	@echo "=================================================================="
 	@echo "Running Verilator Strict Linting for $(TOP_MODULE)"
 	@echo "=================================================================="
-	verilator --lint-only -Wall --timing -I$(TB_DIR) $(SRC_FILES)
+	verilator --lint-only -Wall -Wno-MULTITOP --timing -I$(TB_DIR) $(SRC_FILES)
 
 lint-cadence:
 	@echo "=================================================================="

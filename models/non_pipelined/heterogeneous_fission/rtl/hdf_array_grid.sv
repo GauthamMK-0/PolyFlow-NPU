@@ -6,7 +6,7 @@
 module hdf_array_grid #(
     parameter int DATA_W      = 8,
     parameter int ACC_W       = 32,
-    parameter int LIFETIME_W  = 4,
+    parameter int LIFETIME_W  = 8,
     parameter int NUM_REGIONS = 2,
     parameter int NUM_ROWS    = 4,
     parameter int NUM_COLS    = 4

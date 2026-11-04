@@ -7,7 +7,7 @@ module hdf_top_16x16_tb;
 
     localparam int DATA_W      = 8;
     localparam int ACC_W       = 32;
-    localparam int LIFETIME_W  = 5;
+    localparam int LIFETIME_W  = 8;
     localparam int NUM_ROWS    = 16;
     localparam int NUM_COLS    = 16;
     localparam int NUM_BANKS   = 4;
@@ -161,6 +161,8 @@ module hdf_top_16x16_tb;
         step_clk();
     endtask
 
+    logic signed [ACC_W-1:0] exp_a;
+
     initial begin
         $display("================================================================");
         $display(" [TESTSUITE] Starting 16x16 Scaled Heterogeneous Fission Tests");
@@ -191,49 +193,65 @@ module hdf_top_16x16_tb;
         step_clk();
         acc_clr = 2'b00;
 
-        // Preload weights for Region A (WS) & initialize lifetime counter for both
+        // Preload weights for Region A (WS) via West-to-East shift (8 cols)
+        lifetime_ld      = 2'b00;
+        lifetime_init    = {8'd31, 8'd31};
         w_ld[0]          = 1'b1;
-        lifetime_ld      = 2'b11;
-        lifetime_init    = {5'd31, 5'd31};
-        for (int r = 0; r < NUM_ROWS; r++) begin
-            set_din_w_a(r, 8'd5); // Stationary weight = 5
+        for (int step = 7; step >= 0; step--) begin
+            for (int r = 0; r < NUM_ROWS; r++) begin
+                set_din_w_a(r, 8'd5 + step[7:0]);
+            end
+            step_clk();
         end
-        step_clk();
         w_ld[0]     = 1'b0;
-        lifetime_ld = 2'b00;
 
-        // Cycle 1: Region A (x=3 -> 5*3=15); Region B (Q=4, K=7 -> 28)
+        // Cycle 1: Region A (x=3 -> (5+c)*3); Region B (Q=4, K=7 -> 28)
+        lifetime_ld = 2'b11;
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_a(r, 8'd3);
         for (int c = 8; c < NUM_COLS; c++) set_din_n(c, 8'd4);
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_b(r, 8'd7);
         step_clk();
+        lifetime_ld = 2'b00;
 
-        // Cycle 2: Region A (x=3 -> 15+15=30); Region B (Q=2, K=6 -> 12, acc=28+12=40)
+        // Cycle 2: Region A (x=3 -> acc += (5+c)*3); Region B (Q=2, K=6 -> 12, acc=28+12=40)
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_a(r, 8'd3);
         for (int c = 8; c < NUM_COLS; c++) set_din_n(c, 8'd2);
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_b(r, 8'd6);
         step_clk();
 
-        // Cycle 3: Region A (x=3 -> 30+15=45); Region B stops inputs
+        // Cycle 3: Region A (x=3 -> acc += (5+c)*3); Region B stops inputs
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_a(r, 8'd3);
         for (int c = 8; c < NUM_COLS; c++) set_din_n(c, 8'd0);
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_b(r, 8'd0);
         step_clk();
 
-        // Cycle 4: Region A (x=3 -> 45+15=60)
+        // Cycle 4: Region A (x=3 -> acc = 12*(5+c))
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_a(r, 8'd3);
         step_clk();
         step_clk(); // Drain pipeline stage
 
-        $display("16x16 Reg A (WS, PE[0][0]) = %0d, PE[15][0] = %0d (Expected: 60)", get_pe_acc(0,0), get_pe_acc(15,0));
-        $display("16x16 Reg B (OS, PE[0][8]) = %0d, PE[15][8] = %0d (Expected: 40)", get_pe_acc(0,8), get_pe_acc(15,8));
+        $display("16x16 Reg A: PE[0][0]=%0d, PE[15][7]=%0d (Expected: %0d, %0d)",
+                 get_pe_acc(0,0), get_pe_acc(15,7), 12*(5+0), 12*(5+7));
+        $display("16x16 Reg B: PE[0][8]=%0d, PE[15][15]=%0d (Expected: 40, 40)",
+                 get_pe_acc(0,8), get_pe_acc(15,15));
 
-        if (get_pe_acc(0,0) !== 32'd60 || get_pe_acc(15,0) !== 32'd60 ||
-            get_pe_acc(0,8) !== 32'd40 || get_pe_acc(15,8) !== 32'd40) begin
-            $display("ERROR: 16x16 heterogeneous co-execution mismatch!");
-            error_count++;
-        end else begin
-            $display("PASS: 16x16 Reg A (WS) and Reg B (OS) executed concurrently across 256 PEs!");
+        for (int r = 0; r < NUM_ROWS; r++) begin
+            for (int c = 0; c < 8; c++) begin
+                exp_a = 32'd12 * (32'd5 + c);
+                if (get_pe_acc(r, c) !== exp_a) begin
+                    $display("ERROR: 16x16 Reg A mismatch at PE[%0d][%0d]!", r, c);
+                    error_count++;
+                end
+            end
+            for (int c = 8; c < 16; c++) begin
+                if (get_pe_acc(r, c) !== 32'd40) begin
+                    $display("ERROR: 16x16 Reg B mismatch at PE[%0d][%0d]!", r, c);
+                    error_count++;
+                end
+            end
+        end
+        if (error_count == 0) begin
+            $display("PASS: 16x16 Reg A (WS) and Reg B (OS) executed concurrently across all 256 PEs!");
         end
 
         // TEST 3: EPPA Bandwidth Arbitration

@@ -7,7 +7,7 @@ module hdf_top_tb;
 
     localparam int DATA_W      = 8;
     localparam int ACC_W       = 32;
-    localparam int LIFETIME_W  = 4;
+    localparam int LIFETIME_W  = 8;
     localparam int NUM_ROWS    = 4;
     localparam int NUM_COLS    = 4;
     localparam int NUM_BANKS   = 2;
@@ -160,6 +160,8 @@ module hdf_top_tb;
         step_clk();
     endtask
 
+    logic signed [ACC_W-1:0] exp_a;
+
     initial begin
         $display("================================================================");
         $display(" [TESTSUITE] Starting Heterogeneous Fission Model (Model 3) Tests");
@@ -194,51 +196,70 @@ module hdf_top_tb;
         step_clk();
         acc_clr = 2'b00;
 
-        // Step 2.1: Preload weights for Region A (WS) & initialize lifetime counter for both
+        // Step 2.1: Preload weights for Region A (WS) via West-to-East shift (2 cols)
+        lifetime_ld      = 2'b00;
+        lifetime_init    = {8'd15, 8'd15};
         w_ld[0]          = 1'b1;
-        lifetime_ld      = 2'b11;
-        lifetime_init    = {4'd15, 4'd15}; // 15 cycles lifetime for both regions
-        for (int r = 0; r < NUM_ROWS; r++) begin
-            set_din_w_a(r, 8'd5); // Region A stationary weight = 5
+        for (int step = 1; step >= 0; step--) begin
+            for (int r = 0; r < NUM_ROWS; r++) begin
+                set_din_w_a(r, 8'd5 + step[7:0]);
+            end
+            step_clk();
         end
-        step_clk();
         w_ld[0]     = 1'b0;
-        lifetime_ld = 2'b00;
 
         // Step 2.2: Concurrent execution:
         // Region A receives streaming activations from West: x_A = 3
         // Region B receives Q from North and K from West simultaneously:
-        // Cycle 1: Q=4, K=7 -> Region B prod = 28; Region A prod = 5*3 = 15
+        // Initialize lifetime counters for both regions on cycle 1
+        lifetime_ld = 2'b11;
+
+        // Cycle 1: Q=4, K=7 -> Region B prod = 28; Region A prod = (5+c)*3
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_a(r, 8'd3);
         for (int c = 2; c < NUM_COLS; c++) set_din_n(c, 8'd4);  // Q into Region B cols 2-3
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_b(r, 8'd7); // K into Region B rows
         step_clk();
+        lifetime_ld = 2'b00;
 
-        // Cycle 2: Q=2, K=6 -> Region B prod = 12 (acc = 28+12=40); Region A prod = 15 (acc = 15+15=30)
+        // Cycle 2: Q=2, K=6 -> Region B prod = 12 (acc = 28+12=40); Region A acc += (5+c)*3
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_a(r, 8'd3);
         for (int c = 2; c < NUM_COLS; c++) set_din_n(c, 8'd2);
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_b(r, 8'd6);
         step_clk();
 
-        // Cycle 3: Region A continues compute (x_A=3) -> acc = 30+15 = 45
+        // Cycle 3: Region A continues compute (x_A=3)
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_a(r, 8'd3);
         for (int c = 2; c < NUM_COLS; c++) set_din_n(c, 8'd0);
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_b(r, 8'd0);
         step_clk();
 
-        // Cycle 4: Region A continues compute (x_A=3) -> acc = 45+15 = 60
+        // Cycle 4: Region A continues compute (x_A=3)
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_a(r, 8'd3);
         step_clk();
         step_clk(); // drain pipeline stage
 
-        $display("Region A (WS Mode, PE[0][0]) Accumulator = %0d (Expected: 60)", get_pe_acc(0,0));
-        $display("Region B (OS Mode, PE[0][2]) Accumulator = %0d (Expected: 40)", get_pe_acc(0,2));
+        $display("Region A: PE[0][0]=%0d (Exp: %0d), PE[0][1]=%0d (Exp: %0d)",
+                 get_pe_acc(0,0), 12*(5+0), get_pe_acc(0,1), 12*(5+1));
+        $display("Region B: PE[0][2]=%0d (Exp: 40), PE[0][3]=%0d (Exp: 40)",
+                 get_pe_acc(0,2), get_pe_acc(0,3));
 
-        if (get_pe_acc(0,0) !== 32'd60 || get_pe_acc(0,2) !== 32'd40) begin
-            $display("ERROR: Heterogeneous co-execution calculation mismatch!");
-            error_count++;
-        end else begin
-            $display("PASS: Region A (WS) and Region B (OS) executed simultaneously with correct mathematics!");
+        for (int r = 0; r < NUM_ROWS; r++) begin
+            for (int c = 0; c < 2; c++) begin
+                exp_a = 32'd12 * (32'd5 + c);
+                if (get_pe_acc(r, c) !== exp_a) begin
+                    $display("ERROR: Reg A mismatch at PE[%0d][%0d]!", r, c);
+                    error_count++;
+                end
+            end
+            for (int c = 2; c < 4; c++) begin
+                if (get_pe_acc(r, c) !== 32'd40) begin
+                    $display("ERROR: Reg B mismatch at PE[%0d][%0d]!", r, c);
+                    error_count++;
+                end
+            end
+        end
+        if (error_count == 0) begin
+            $display("PASS: Region A (WS) and Region B (OS) executed simultaneously with correct mathematics across all columns!");
         end
 
         // -------------------------------------------------------------

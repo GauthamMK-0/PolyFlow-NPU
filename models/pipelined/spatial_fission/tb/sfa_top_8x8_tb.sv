@@ -149,6 +149,8 @@ module sfa_top_8x8_tb;
         step_clk();
     endtask
 
+    logic signed [ACC_W-1:0] exp_a, exp_b;
+
     initial begin
         $display("================================================================");
         $display(" [TESTSUITE] Starting 8x8 Scaled Spatial Fission Pod Tests");
@@ -178,13 +180,15 @@ module sfa_top_8x8_tb;
         step_clk();
         acc_clr = 2'b00;
 
-        // Preload weights: Reg A = 5, Reg B = 7
+        // Preload weights into Region A (w=5+c) and Region B (w=7+c) via West-to-East shift (4 cols each)
         w_ld = 2'b11;
-        for (int r = 0; r < NUM_ROWS; r++) begin
-            set_din_w_a(r, 8'd5);
-            set_din_w_b(r, 8'd7);
+        for (int step = 3; step >= 0; step--) begin
+            for (int r = 0; r < NUM_ROWS; r++) begin
+                set_din_w_a(r, 8'd5 + step[7:0]);
+                set_din_w_b(r, 8'd7 + step[7:0]);
+            end
+            step_clk();
         end
-        step_clk();
         w_ld = 2'b00;
 
         // Stream activations: Reg A = 3, Reg B = 2
@@ -197,15 +201,29 @@ module sfa_top_8x8_tb;
         compute_en = 2'b00;
         step_clk(); // Drain pipeline stage
 
-        $display("8x8 Reg A: PE[0][0]=%0d, PE[7][0]=%0d (Expected: 60)", get_pe_acc(0,0), get_pe_acc(7,0));
-        $display("8x8 Reg B: PE[0][4]=%0d, PE[7][4]=%0d (Expected: 56)", get_pe_acc(0,4), get_pe_acc(7,4));
+        $display("8x8 Reg A: PE[0][0]=%0d, PE[7][3]=%0d (Expected: %0d, %0d)",
+                 get_pe_acc(0,0), get_pe_acc(7,3), 12*(5+0), 12*(5+3));
+        $display("8x8 Reg B: PE[0][4]=%0d, PE[7][7]=%0d (Expected: %0d, %0d)",
+                 get_pe_acc(0,4), get_pe_acc(7,7), 8*(7+0), 8*(7+3));
 
-        if (get_pe_acc(0,0) !== 32'd60 || get_pe_acc(7,0) !== 32'd60 ||
-            get_pe_acc(0,4) !== 32'd56 || get_pe_acc(7,4) !== 32'd56) begin
-            $display("ERROR: 8x8 concurrent execution calculation mismatch!");
-            error_count++;
-        end else begin
-            $display("PASS: 8x8 multi-tenant spatial fission co-executed successfully.");
+        for (int r = 0; r < NUM_ROWS; r++) begin
+            for (int c = 0; c < 4; c++) begin
+                exp_a = 32'd12 * (32'd5 + c);
+                if (get_pe_acc(r, c) !== exp_a) begin
+                    $display("ERROR: 8x8 Reg A mismatch at PE[%0d][%0d]!", r, c);
+                    error_count++;
+                end
+            end
+            for (int c = 4; c < 8; c++) begin
+                exp_b = 32'd8 * (32'd7 + (c - 4));
+                if (get_pe_acc(r, c) !== exp_b) begin
+                    $display("ERROR: 8x8 Reg B mismatch at PE[%0d][%0d]!", r, c);
+                    error_count++;
+                end
+            end
+        end
+        if (error_count == 0) begin
+            $display("PASS: 8x8 multi-tenant spatial fission co-executed successfully across all 64 PEs.");
         end
 
         // TEST 3: EPPA Memory Bandwidth Arbitration

@@ -87,6 +87,8 @@ module dfs_top_tb;
         step_clk();
     endtask
 
+    logic signed [ACC_W-1:0] exp_val;
+
     initial begin
         $display("================================================================");
         $display(" [TESTSUITE] Starting Dataflow Switching Model (Model 1) Tests");
@@ -103,32 +105,38 @@ module dfs_top_tb;
         step_clk();
         tile_acc_clr      = 0;
 
-        // Step 1.1: Preload stationary weights from West into row 0
+        // Step 1.1: Preload stationary weights by shifting West-to-East across all NUM_COLS columns
         tile_w_ld = 1;
-        for (int r = 0; r < NUM_ROWS; r++) begin
-            set_din_w(r, 8'd5); // Stationary weight = 5
+        for (int step = NUM_COLS - 1; step >= 0; step--) begin
+            for (int r = 0; r < NUM_ROWS; r++) begin
+                set_din_w(r, 8'd5 + step[7:0]);
+            end
+            step_clk();
         end
-        step_clk();
         tile_w_ld = 0;
 
-        // Step 1.2: Stream activation inputs through West port and accumulate
+        // Step 1.2: Stream activation inputs through West port and accumulate (4 cycles of act = 3)
         tile_compute_en = 1;
         for (int r = 0; r < NUM_ROWS; r++) begin
             set_din_w(r, 8'd3); // Activation = 3
         end
-        step_clk(); // cycle 1: acc += 5 * 3 = 15
-        step_clk(); // cycle 2: acc += 15 = 30
-        step_clk(); // cycle 3: acc += 15 = 45
-        step_clk(); // cycle 4: acc += 15 = 60
+        repeat (4) step_clk();
         tile_compute_en = 0;
         step_clk(); // drain pipeline stage
 
-        $display("WS Mode: PE[0][0] Accumulator = %0d (Expected: 60)", get_pe_acc(0,0));
-        if (get_pe_acc(0,0) !== 32'd60) begin
-            $display("ERROR: WS Mode calculation mismatch!");
-            error_count++;
-        end else begin
-            $display("PASS: WS Mode verified successfully.");
+        $display("WS Mode: PE[0][0] = %0d (Exp: %0d), PE[0][%0d] = %0d (Exp: %0d)",
+                 get_pe_acc(0,0), 12*(5+0), NUM_COLS-1, get_pe_acc(0,NUM_COLS-1), 12*(5+NUM_COLS-1));
+        for (int r = 0; r < NUM_ROWS; r++) begin
+            for (int c = 0; c < NUM_COLS; c++) begin
+                exp_val = 32'd12 * (32'd5 + c);
+                if (get_pe_acc(r, c) !== exp_val) begin
+                    $display("ERROR: WS Mode mismatch at PE[%0d][%0d]: %0d (Expected: %0d)", r, c, get_pe_acc(r, c), exp_val);
+                    error_count++;
+                end
+            end
+        end
+        if (error_count == 0) begin
+            $display("PASS: WS Mode verified successfully across all columns and rows.");
         end
 
         // -------------------------------------------------------------
