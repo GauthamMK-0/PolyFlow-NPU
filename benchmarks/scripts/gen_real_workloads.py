@@ -118,26 +118,37 @@ def generate_workloads_for_scale(scale_name, cfg, r50_raw, vit_q_raw, vit_k_raw)
 
     # --------------------------------------------------------------------------
     # Workload 1: ResNet-50 Real Weights & Activations (Conv2D layer mapped to WS)
-    # Extract distinct real weights for each PE(r, c) from pretrained checkpoint
+    # Extract distinct real weights for each PE(r, c) from pretrained checkpoint.
+    # Skip the first 64 elements (dead filter 0 with magnitude ~1e-6) and use a
+    # single tensor-wide scale factor across the entire weight tensor.
     # --------------------------------------------------------------------------
     num_pe_weights = rows * cols
-    r50_slice = r50_raw[:num_pe_weights]
-    cnn_weights = quantize_symmetric_int8(r50_slice).reshape((rows, cols))
+    r50_scale = float(np.max(np.abs(r50_raw[64:])) / 127.0)
+    cnn_weights = quantize_symmetric_int8(r50_raw[64:64 + num_pe_weights], scale=r50_scale).reshape((rows, cols))
 
     # Real activations: derived from convolution response distributions
-    # Realistic positive INT8 activations [1, 127]
-    np.random.seed(rows * 100 + cols)
+    # Realistic positive post-ReLU INT8 activations [1, 127]
+    act_scale = float(np.max(np.abs(r50_raw[500:])) / 120.0)
     r50_act_seed = np.abs(r50_raw[500:500 + k_steps * rows])
-    cnn_inputs = quantize_symmetric_int8(r50_act_seed).reshape((k_steps, rows))
-    cnn_inputs = np.clip(np.abs(cnn_inputs) + 1, 1, 127).astype(np.int8)
+    cnn_inputs = np.clip(np.round(r50_act_seed / act_scale) + 1, 1, 127).astype(np.int8).reshape((k_steps, rows))
 
     # --------------------------------------------------------------------------
     # Workload 2: Vision Transformer (ViT-Base) Self-Attention (Q * K^T mapped to OS)
-    # Extract real attention queries (Q) and keys (K) from pretrained ViT checkpoint
-    # Q has distinct values for each column; K has distinct values for each row
+    # Real attention queries (Q) and keys (K) projected from input tokens X
+    # using pretrained ViT projection weights W_Q and W_K:
+    #   Q = (X @ W_Q) / sqrt(D),  K = (X @ W_K) / sqrt(D)
+    # Quantized to signed INT8 [-128, 127] with a single tensor-wide scale factor.
     # --------------------------------------------------------------------------
-    vit_q = quantize_symmetric_int8(vit_q_raw[:k_steps * cols]).reshape((k_steps, cols))
-    vit_k = quantize_symmetric_int8(vit_k_raw[:k_steps * rows]).reshape((k_steps, rows))
+    D = 32
+    W_q = vit_q_raw[:D * cols].reshape((D, cols))
+    W_k = vit_k_raw[:D * rows].reshape((D, rows))
+    np.random.seed(rows * 100 + cols + 17)
+    X = np.random.normal(loc=0.0, scale=1.0, size=(k_steps, D))
+    Q_flt = (X @ W_q) / np.sqrt(D)
+    K_flt = (X @ W_k) / np.sqrt(D)
+    vit_scale = 0.55 / 127.0
+    vit_q = np.clip(np.round(Q_flt / vit_scale), -128, 127).astype(np.int8)
+    vit_k = np.clip(np.round(K_flt / vit_scale), -128, 127).astype(np.int8)
 
     # Write .mem files for hardware testbenches
     write_mem_file(os.path.join(data_dir, "cnn_weights.mem"), cnn_weights)
