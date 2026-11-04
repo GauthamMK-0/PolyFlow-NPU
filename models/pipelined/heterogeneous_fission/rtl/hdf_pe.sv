@@ -1,5 +1,6 @@
 // hdf_pe.sv — Heterogeneous Processing Element for PolyFlow-NPU
 // Supports runtime WS / OS / IS switching, lifetime drain counter, and bank stale handshakes.
+// 32-bit vertical partial-sum mesh + registered systolic forward hops.
 
 `timescale 1ns/1ps
 
@@ -12,9 +13,10 @@ module hdf_pe #(
     input  logic                    rst_n,
 
     // Directional streaming data ports
-    input  logic [DATA_W-1:0]       din_n, // Streams North -> South
-    input  logic [DATA_W-1:0]       din_w, // Streams West -> East
-    output logic [DATA_W-1:0]       dout_s,
+    // din_n / dout_s carry 32-bit partial sums in WS mode, and 8-bit activations in OS mode
+    input  logic [ACC_W-1:0]        din_n, // Streams North -> South (32 bits)
+    input  logic [DATA_W-1:0]       din_w, // Streams West -> East (8 bits)
+    output logic [ACC_W-1:0]        dout_s,
     output logic [DATA_W-1:0]       dout_e,
 
     // Full accumulator output
@@ -76,17 +78,18 @@ module hdf_pe #(
         if (!rst_n) begin
             stat_operand_reg <= '0;
         end else if (w_ld && !bank_role_stale) begin
-            stat_operand_reg <= (dataflow_mode == DF_WS) ? din_w : din_n;
+            stat_operand_reg <= (dataflow_mode == DF_WS) ? din_w : din_n[DATA_W-1:0];
         end
     end
 
     // --- Stage 1: Multiplication with Pipeline Register ---
-    wire signed [DATA_W-1:0] mul_a = (dataflow_mode == DF_OS) ? $signed(din_n) : $signed(stat_operand_reg);
+    wire signed [DATA_W-1:0] mul_a = (dataflow_mode == DF_OS) ? $signed(din_n[DATA_W-1:0]) : $signed(stat_operand_reg);
     wire signed [DATA_W-1:0] mul_b = $signed(din_w);
 
     logic signed [2*DATA_W-1:0] product_raw;
     logic signed [2*DATA_W-1:0] product_reg;
     logic                       compute_pipe;
+    logic [1:0]                 df_mode_pipe;
 
     assign product_raw = mul_a * mul_b;
 
@@ -94,18 +97,21 @@ module hdf_pe #(
         if (!rst_n) begin
             product_reg  <= '0;
             compute_pipe <= 1'b0;
+            df_mode_pipe <= DF_WS;
         end else if (acc_clr) begin
             product_reg  <= '0;
             compute_pipe <= 1'b0;
+            df_mode_pipe <= dataflow_mode;
         end else begin
             product_reg  <= product_raw;
             compute_pipe <= mac_en;
+            df_mode_pipe <= dataflow_mode;
         end
     end
 
     wire signed [ACC_W-1:0] product_sext = {{ (ACC_W - 2*DATA_W){product_reg[2*DATA_W-1]} }, product_reg};
 
-    // --- Stage 2: Redundant Carry-Save Accumulator (CSA) ---
+    // --- Stage 2: Redundant Carry-Save Accumulator (CSA) for OS Mode ---
     logic [ACC_W-1:0] acc_sum;
     logic [ACC_W-1:0] acc_carry;
 
@@ -127,6 +133,9 @@ module hdf_pe #(
     endgenerate
     assign next_csa_carry[0] = 1'b0;
 
+    // Partial sum computation for WS / IS modes
+    wire signed [ACC_W-1:0] psum_next = $signed(din_n) + product_sext;
+
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             acc_sum   <= '0;
@@ -135,20 +144,50 @@ module hdf_pe #(
             acc_sum   <= '0;
             acc_carry <= '0;
         end else if (compute_pipe) begin
-            acc_sum   <= next_csa_sum;
-            acc_carry <= next_csa_carry;
+            if (df_mode_pipe == DF_OS || df_mode_pipe == DF_IS) begin
+                // In-place CSA accumulation for Output-Stationary and Input-Stationary modes
+                acc_sum   <= next_csa_sum;
+                acc_carry <= next_csa_carry;
+            end else begin
+                // Local partial sum tracking for WS mode
+                acc_sum   <= psum_next;
+                acc_carry <= '0;
+            end
         end
     end
 
-    // Systolic forward passing:
-    // In WS mode during weight preload (w_ld=1), dout_e shifts out the registered operand,
-    // forming a West-to-East shift chain across columns so each PE receives its distinct weight W[r, c].
-    // During compute (w_ld=0), dout_e broadcasts input activation West-to-East across row r.
-    // In IS mode during input preload, dout_s shifts stat_operand_reg North-to-South down columns.
-    assign dout_s  = (w_ld && (dataflow_mode == DF_IS) && !bank_role_stale) ? stat_operand_reg : din_n;
-    assign dout_e  = (w_ld && (dataflow_mode == DF_WS) && !bank_role_stale) ? stat_operand_reg : din_w;
+    // --- Registered Systolic Inter-PE Forwarding ---
+    logic [DATA_W-1:0] din_w_reg;
+    logic [ACC_W-1:0]  dout_s_reg;
+
+    // Every inter-PE connection is registered (1 clock hop per PE)
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            din_w_reg  <= '0;
+            dout_s_reg <= '0;
+        end else begin
+            din_w_reg <= din_w;
+
+            // Vertical North -> South forwarding
+            if (dataflow_mode == DF_OS) begin
+                dout_s_reg <= {{ (ACC_W-DATA_W){din_n[DATA_W-1]} }, din_n[DATA_W-1:0]}; // Forward streaming operand North -> South
+            end else begin
+                dout_s_reg <= psum_next;        // Forward 32-bit partial sum South (WS mode)
+            end
+        end
+    end
+
+    // Horizontal West -> East forwarding:
+    // During weight preload: shifts registered stationary weight (1 hop/cycle)
+    // During compute: forwards registered activation (1 hop/cycle)
+    assign dout_e = (w_ld && (dataflow_mode == DF_WS) && !bank_role_stale) ? stat_operand_reg : din_w_reg;
+
+    // Vertical North -> South forwarding:
+    // During IS preload: shifts registered stationary operand (1 hop/cycle)
+    // During compute: forwards registered partial sum or streaming operand (1 hop/cycle)
+    assign dout_s = (w_ld && (dataflow_mode == DF_IS) && !bank_role_stale) ? {{ (ACC_W-DATA_W){1'b0} }, stat_operand_reg} : dout_s_reg;
 
     // Resolved accumulator output
-    assign acc_out = acc_sum + acc_carry;
+    assign acc_out = (dataflow_mode == DF_WS) ? dout_s : (acc_sum + acc_carry);
 
 endmodule

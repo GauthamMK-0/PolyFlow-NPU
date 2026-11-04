@@ -33,12 +33,12 @@ module sfa_top_tb;
     logic [NUM_REGIONS-1:0]             acc_clr;
     logic [NUM_REGIONS-1:0]             compute_en;
 
-    logic [NUM_COLS*DATA_W-1:0]         din_n;
+    logic [NUM_COLS*ACC_W-1:0]         din_n;
     logic [NUM_ROWS*DATA_W-1:0]         din_w_region_a;
     logic [NUM_ROWS*DATA_W-1:0]         din_w_region_b;
 
     /* verilator lint_off UNUSEDSIGNAL */
-    wire  [NUM_COLS*DATA_W-1:0]         dout_s;
+    wire  [NUM_COLS*ACC_W-1:0]         dout_s;
     wire  [NUM_ROWS*DATA_W-1:0]         dout_e;
     wire  [NUM_REGIONS-1:0]             reconfig_urgent;
     wire  [NUM_BANKS-1:0]               scrub_active_bus;
@@ -200,28 +200,25 @@ module sfa_top_tb;
             set_din_w_a(r, 8'd3); // Region A activation = 3
             set_din_w_b(r, 8'd2); // Region B activation = 2
         end
-        step_clk();
-        step_clk();
-        step_clk();
-        step_clk();
+        repeat (NUM_ROWS + NUM_COLS + 2) step_clk();
         compute_en = 2'b00;
         step_clk(); // drain pipeline stage
 
-        $display("Region A: PE[0][0]=%0d (Exp: %0d), PE[0][1]=%0d (Exp: %0d)",
-                 get_pe_acc(0,0), 12*(5+0), get_pe_acc(0,1), 12*(5+1));
-        $display("Region B: PE[0][2]=%0d (Exp: %0d), PE[0][3]=%0d (Exp: %0d)",
-                 get_pe_acc(0,2), 8*(7+0), get_pe_acc(0,3), 8*(7+1));
+        $display("Region A: PE[0][0]=%0d (Exp: %0d), PE[3][1]=%0d (Exp: %0d)",
+                 get_pe_acc(0,0), 1*3*(5+0), get_pe_acc(3,1), 4*3*(5+1));
+        $display("Region B: PE[0][2]=%0d (Exp: %0d), PE[3][3]=%0d (Exp: %0d)",
+                 get_pe_acc(0,2), 1*2*(7+0), get_pe_acc(3,3), 4*2*(7+1));
 
         for (int r = 0; r < NUM_ROWS; r++) begin
             for (int c = 0; c < 2; c++) begin
-                exp_a = 32'd12 * (32'd5 + c);
+                exp_a = (r + 1) * 32'd3 * (32'd5 + c);
                 if (get_pe_acc(r, c) !== exp_a) begin
                     $display("ERROR: Reg A mismatch at PE[%0d][%0d]!", r, c);
                     error_count++;
                 end
             end
             for (int c = 2; c < 4; c++) begin
-                exp_b = 32'd8 * (32'd7 + (c - 2));
+                exp_b = (r + 1) * 32'd2 * (32'd7 + (c - 2));
                 if (get_pe_acc(r, c) !== exp_b) begin
                     $display("ERROR: Reg B mismatch at PE[%0d][%0d]!", r, c);
                     error_count++;

@@ -36,12 +36,12 @@ module hdf_top_tb;
     logic [NUM_REGIONS-1:0]             w_ld;
     logic [NUM_REGIONS-1:0]             acc_clr;
 
-    logic [NUM_COLS*DATA_W-1:0]         din_n;
+    logic [NUM_COLS*ACC_W-1:0]         din_n;
     logic [NUM_ROWS*DATA_W-1:0]         din_w_region_a;
     logic [NUM_ROWS*DATA_W-1:0]         din_w_region_b;
 
     /* verilator lint_off UNUSEDSIGNAL */
-    wire  [NUM_COLS*DATA_W-1:0]         dout_s;
+    wire  [NUM_COLS*ACC_W-1:0]         dout_s;
     wire  [NUM_ROWS*DATA_W-1:0]         dout_e;
     wire  [NUM_REGIONS-1:0]             reconfig_urgent;
     wire  [NUM_BANKS-1:0]               scrub_active_bus;
@@ -65,8 +65,8 @@ module hdf_top_tb;
         return acc_out_flat[(r*NUM_COLS + c)*ACC_W +: ACC_W];
     endfunction
 
-    task automatic set_din_n(int c, logic [DATA_W-1:0] val);
-        din_n[c*DATA_W +: DATA_W] = val;
+    task automatic set_din_n(int c, logic [ACC_W-1:0] val);
+        din_n[c*ACC_W +: ACC_W] = val;
     endtask
 
     task automatic set_din_w_a(int r, logic [DATA_W-1:0] val);
@@ -211,7 +211,7 @@ module hdf_top_tb;
         // Region B receives Q from North and K from West simultaneously:
         // Cycle 1: Q=4, K=7 -> Region B prod = 28; Region A prod = 5*3 = 15
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_a(r, 8'd3);
-        for (int c = 2; c < NUM_COLS; c++) set_din_n(c, 8'd4);  // Q into Region B cols 2-3
+        for (int c = 2; c < NUM_COLS; c++) set_din_n(c, 32'd4);  // Q into Region B cols 2-3
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_b(r, 8'd7); // K into Region B rows
         step_clk();
 
@@ -225,7 +225,7 @@ module hdf_top_tb;
 
         // Cycle 2: Q=2, K=6 -> Region B prod = 12; Region A prod = 15
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_a(r, 8'd3);
-        for (int c = 2; c < NUM_COLS; c++) set_din_n(c, 8'd2);
+        for (int c = 2; c < NUM_COLS; c++) set_din_n(c, 32'd2);
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_b(r, 8'd6);
         step_clk();
 

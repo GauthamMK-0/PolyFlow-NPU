@@ -33,12 +33,12 @@ module sfa_top_tb;
     logic [NUM_REGIONS-1:0]             acc_clr;
     logic [NUM_REGIONS-1:0]             compute_en;
 
-    logic [NUM_COLS*DATA_W-1:0]         din_n;
+    logic [NUM_COLS*ACC_W-1:0]         din_n;
     logic [NUM_ROWS*DATA_W-1:0]         din_w_region_a;
     logic [NUM_ROWS*DATA_W-1:0]         din_w_region_b;
 
     /* verilator lint_off UNUSEDSIGNAL */
-    wire  [NUM_COLS*DATA_W-1:0]         dout_s;
+    wire  [NUM_COLS*ACC_W-1:0]         dout_s;
     wire  [NUM_ROWS*DATA_W-1:0]         dout_e;
     wire  [NUM_REGIONS-1:0]             reconfig_urgent;
     /* verilator lint_on UNUSEDSIGNAL */

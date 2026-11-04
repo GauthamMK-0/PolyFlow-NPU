@@ -34,12 +34,12 @@ module sfa_top_8x8_tb;
     logic [NUM_REGIONS-1:0]             acc_clr;
     logic [NUM_REGIONS-1:0]             compute_en;
 
-    logic [NUM_COLS*DATA_W-1:0]         din_n;
+    logic [NUM_COLS*ACC_W-1:0]         din_n;
     logic [NUM_ROWS*DATA_W-1:0]         din_w_region_a;
     logic [NUM_ROWS*DATA_W-1:0]         din_w_region_b;
 
     /* verilator lint_off UNUSEDSIGNAL */
-    wire  [NUM_COLS*DATA_W-1:0]         dout_s;
+    wire  [NUM_COLS*ACC_W-1:0]         dout_s;
     wire  [NUM_ROWS*DATA_W-1:0]         dout_e;
     wire  [NUM_REGIONS-1:0]             reconfig_urgent;
     wire  [NUM_BANKS-1:0]               scrub_active_bus;
@@ -197,25 +197,25 @@ module sfa_top_8x8_tb;
             set_din_w_a(r, 8'd3);
             set_din_w_b(r, 8'd2);
         end
-        repeat (4) step_clk();
+        repeat (NUM_ROWS + NUM_COLS + 2) step_clk();
         compute_en = 2'b00;
         step_clk(); // Drain pipeline stage
 
         $display("8x8 Reg A: PE[0][0]=%0d, PE[7][3]=%0d (Expected: %0d, %0d)",
-                 get_pe_acc(0,0), get_pe_acc(7,3), 12*(5+0), 12*(5+3));
+                 get_pe_acc(0,0), get_pe_acc(7,3), 1*3*(5+0), NUM_ROWS*3*(5+3));
         $display("8x8 Reg B: PE[0][4]=%0d, PE[7][7]=%0d (Expected: %0d, %0d)",
-                 get_pe_acc(0,4), get_pe_acc(7,7), 8*(7+0), 8*(7+3));
+                 get_pe_acc(0,4), get_pe_acc(7,7), 1*2*(7+0), NUM_ROWS*2*(7+3));
 
         for (int r = 0; r < NUM_ROWS; r++) begin
             for (int c = 0; c < 4; c++) begin
-                exp_a = 32'd12 * (32'd5 + c);
+                exp_a = (r + 1) * 32'd3 * (32'd5 + c);
                 if (get_pe_acc(r, c) !== exp_a) begin
                     $display("ERROR: 8x8 Reg A mismatch at PE[%0d][%0d]!", r, c);
                     error_count++;
                 end
             end
             for (int c = 4; c < 8; c++) begin
-                exp_b = 32'd8 * (32'd7 + (c - 4));
+                exp_b = (r + 1) * 32'd2 * (32'd7 + (c - 4));
                 if (get_pe_acc(r, c) !== exp_b) begin
                     $display("ERROR: 8x8 Reg B mismatch at PE[%0d][%0d]!", r, c);
                     error_count++;

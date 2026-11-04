@@ -1,5 +1,6 @@
-// hdf_pe.sv — Heterogeneous Processing Element for PolyFlow-NPU
+// hdf_pe.sv — Heterogeneous Processing Element for PolyFlow-NPU (Non-Pipelined Variant)
 // Supports runtime WS / OS / IS switching, lifetime drain counter, and bank stale handshakes.
+// 32-bit vertical partial-sum mesh.
 
 `timescale 1ns/1ps
 
@@ -12,9 +13,9 @@ module hdf_pe #(
     input  logic                    rst_n,
 
     // Directional streaming data ports
-    input  logic [DATA_W-1:0]       din_n, // Streams North -> South
-    input  logic [DATA_W-1:0]       din_w, // Streams West -> East
-    output logic [DATA_W-1:0]       dout_s,
+    input  logic [ACC_W-1:0]        din_n, // Streams North -> South (32 bits)
+    input  logic [DATA_W-1:0]       din_w, // Streams West -> East (8 bits)
+    output logic [ACC_W-1:0]        dout_s,
     output logic [DATA_W-1:0]       dout_e,
 
     // Full accumulator output
@@ -76,12 +77,12 @@ module hdf_pe #(
         if (!rst_n) begin
             stat_operand_reg <= '0;
         end else if (w_ld && !bank_role_stale) begin
-            stat_operand_reg <= (dataflow_mode == DF_WS) ? din_w : din_n;
+            stat_operand_reg <= (dataflow_mode == DF_WS) ? din_w : din_n[DATA_W-1:0];
         end
     end
 
     // Operand selection and isolation
-    wire signed [DATA_W-1:0] mul_a = (dataflow_mode == DF_OS) ? $signed(din_n) : $signed(stat_operand_reg);
+    wire signed [DATA_W-1:0] mul_a = (dataflow_mode == DF_OS) ? $signed(din_n[DATA_W-1:0]) : $signed(stat_operand_reg);
     wire signed [DATA_W-1:0] mul_b = $signed(din_w);
     logic signed [2*DATA_W-1:0] product;
     logic signed [ACC_W-1:0]    product_sext;
@@ -90,17 +91,15 @@ module hdf_pe #(
     assign product_sext = {{ (ACC_W - 2*DATA_W){product[2*DATA_W-1]} }, product};
 
     wire compute_active  = mac_en;
-
-    // Non-Pipelined Combinational MAC (No accumulator registers)
     wire _unused_acc = &{1'b0, acc_clr};
 
-    // Systolic forward passing:
-    // In WS mode during weight preload (w_ld=1), dout_e shifts out the registered operand,
-    // forming a West-to-East shift chain across columns so each PE receives its distinct weight W[r, c].
-    // During compute (w_ld=0), dout_e broadcasts input activation West-to-East across row r.
-    // In IS mode during input preload, dout_s shifts stat_operand_reg North-to-South down columns.
-    assign dout_s  = (w_ld && (dataflow_mode == DF_IS) && !bank_role_stale) ? stat_operand_reg : din_n;
+    wire signed [ACC_W-1:0] psum_comb = $signed(din_n) + product_sext;
+
+    // Forward passing
     assign dout_e  = (w_ld && (dataflow_mode == DF_WS) && !bank_role_stale) ? stat_operand_reg : din_w;
-    assign acc_out = compute_active ? product_sext : '0;
+    assign dout_s  = (w_ld && (dataflow_mode == DF_IS) && !bank_role_stale) ? {{ (ACC_W-DATA_W){1'b0} }, stat_operand_reg} :
+                     (dataflow_mode == DF_OS) ? din_n : psum_comb;
+
+    assign acc_out = compute_active ? ((dataflow_mode == DF_OS || dataflow_mode == DF_IS) ? product_sext : psum_comb) : '0;
 
 endmodule

@@ -18,10 +18,10 @@ module dfs_top_tb;
     logic                               tile_acc_clr;
     logic                               tile_compute_en;
 
-    logic [NUM_COLS*DATA_W-1:0]         din_n;
+    logic [NUM_COLS*ACC_W-1:0]         din_n;
     logic [NUM_ROWS*DATA_W-1:0]         din_w;
     /* verilator lint_off UNUSEDSIGNAL */
-    wire  [NUM_COLS*DATA_W-1:0]         dout_s;
+    wire  [NUM_COLS*ACC_W-1:0]         dout_s;
     wire  [NUM_ROWS*DATA_W-1:0]         dout_e;
     /* verilator lint_on UNUSEDSIGNAL */
     wire  [NUM_ROWS*NUM_COLS*ACC_W-1:0] acc_out_flat;
@@ -34,8 +34,8 @@ module dfs_top_tb;
     endfunction
 
     // Helper to set din_n for column c
-    task automatic set_din_n(int c, logic [DATA_W-1:0] val);
-        din_n[c*DATA_W +: DATA_W] = val;
+    task automatic set_din_n(int c, logic [ACC_W-1:0] val);
+        din_n[c*ACC_W +: ACC_W] = val;
     endtask
 
     // Helper to set din_w for row r
@@ -139,7 +139,7 @@ module dfs_top_tb;
         // In OS mode, operands stream simultaneously from North (Q) and West (K)
         tile_compute_en = 1;
         // Cycle 1: Q=4, K=7 -> prod = 28
-        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 8'd4);
+        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 32'd4);
         for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd7);
         step_clk();
 
@@ -152,7 +152,7 @@ module dfs_top_tb;
         end
 
         // Cycle 2: Q=2, K=6 -> prod = 12
-        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 8'd2);
+        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 32'd2);
         for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd6);
         step_clk();
 
@@ -173,7 +173,7 @@ module dfs_top_tb;
 
         // Preload activation from North
         tile_w_ld = 1;
-        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 8'd6); // Stationary activation = 6
+        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 32'd6); // Stationary activation = 6
         step_clk();
         tile_w_ld = 0;
 

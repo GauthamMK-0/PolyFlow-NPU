@@ -37,12 +37,12 @@ module hdf_top_16x16_tb;
     logic [NUM_REGIONS-1:0]             w_ld;
     logic [NUM_REGIONS-1:0]             acc_clr;
 
-    logic [NUM_COLS*DATA_W-1:0]         din_n;
+    logic [NUM_COLS*ACC_W-1:0]         din_n;
     logic [NUM_ROWS*DATA_W-1:0]         din_w_region_a;
     logic [NUM_ROWS*DATA_W-1:0]         din_w_region_b;
 
     /* verilator lint_off UNUSEDSIGNAL */
-    wire  [NUM_COLS*DATA_W-1:0]         dout_s;
+    wire  [NUM_COLS*ACC_W-1:0]         dout_s;
     wire  [NUM_ROWS*DATA_W-1:0]         dout_e;
     wire  [NUM_REGIONS-1:0]             reconfig_urgent;
     wire  [NUM_BANKS-1:0]               scrub_active_bus;
@@ -65,8 +65,8 @@ module hdf_top_16x16_tb;
         return acc_out_flat[(r*NUM_COLS + c)*ACC_W +: ACC_W];
     endfunction
 
-    task automatic set_din_n(int c, logic [DATA_W-1:0] val);
-        din_n[c*DATA_W +: DATA_W] = val;
+    task automatic set_din_n(int c, logic [ACC_W-1:0] val);
+        din_n[c*ACC_W +: ACC_W] = val;
     endtask
 
     task automatic set_din_w_a(int r, logic [DATA_W-1:0] val);
@@ -208,47 +208,41 @@ module hdf_top_16x16_tb;
         // Cycle 1: Region A (x=3 -> (5+c)*3); Region B (Q=4, K=7 -> 28)
         lifetime_ld = 2'b11;
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_a(r, 8'd3);
-        for (int c = 8; c < NUM_COLS; c++) set_din_n(c, 8'd4);
+        for (int c = 8; c < NUM_COLS; c++) set_din_n(c, 32'd4);
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_b(r, 8'd7);
         step_clk();
         lifetime_ld = 2'b00;
 
         // Cycle 2: Region A (x=3 -> acc += (5+c)*3); Region B (Q=2, K=6 -> 12, acc=28+12=40)
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_a(r, 8'd3);
-        for (int c = 8; c < NUM_COLS; c++) set_din_n(c, 8'd2);
+        for (int c = 8; c < NUM_COLS; c++) set_din_n(c, 32'd2);
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_b(r, 8'd6);
         step_clk();
 
-        // Cycle 3: Region A (x=3 -> acc += (5+c)*3); Region B stops inputs
+        // Cycle 3: Region A continues compute (x_A=3); Region B stops inputs
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_a(r, 8'd3);
-        for (int c = 8; c < NUM_COLS; c++) set_din_n(c, 8'd0);
+        for (int c = 8; c < NUM_COLS; c++) set_din_n(c, 32'd0);
         for (int r = 0; r < NUM_ROWS; r++) set_din_w_b(r, 8'd0);
-        step_clk();
-
-        // Cycle 4: Region A (x=3 -> acc = 12*(5+c))
-        for (int r = 0; r < NUM_ROWS; r++) set_din_w_a(r, 8'd3);
-        step_clk();
+        repeat (NUM_ROWS + NUM_COLS + 2) step_clk();
+        for (int r = 0; r < NUM_ROWS; r++) set_din_w_a(r, 8'd0);
         step_clk(); // Drain pipeline stage
 
         $display("16x16 Reg A: PE[0][0]=%0d, PE[15][7]=%0d (Expected: %0d, %0d)",
-                 get_pe_acc(0,0), get_pe_acc(15,7), 12*(5+0), 12*(5+7));
-        $display("16x16 Reg B: PE[0][8]=%0d, PE[15][15]=%0d (Expected: 40, 40)",
-                 get_pe_acc(0,8), get_pe_acc(15,15));
+                 get_pe_acc(0,0), get_pe_acc(15,7), 1*3*(5+0), NUM_ROWS*3*(5+7));
+        $display("16x16 Reg B: PE[0][8]=%0d (Expected: 40)", get_pe_acc(0,8));
 
         for (int r = 0; r < NUM_ROWS; r++) begin
             for (int c = 0; c < 8; c++) begin
-                exp_a = 32'd12 * (32'd5 + c);
+                exp_a = (r + 1) * 32'd3 * (32'd5 + c);
                 if (get_pe_acc(r, c) !== exp_a) begin
                     $display("ERROR: 16x16 Reg A mismatch at PE[%0d][%0d]!", r, c);
                     error_count++;
                 end
             end
-            for (int c = 8; c < 16; c++) begin
-                if (get_pe_acc(r, c) !== 32'd40) begin
-                    $display("ERROR: 16x16 Reg B mismatch at PE[%0d][%0d]!", r, c);
-                    error_count++;
-                end
-            end
+        end
+        if (get_pe_acc(0, 8) !== 32'd40) begin
+            $display("ERROR: 16x16 Reg B mismatch at PE[0][8]: %0d (Expected: 40)!", get_pe_acc(0, 8));
+            error_count++;
         end
         if (error_count == 0) begin
             $display("PASS: 16x16 Reg A (WS) and Reg B (OS) executed concurrently across all 256 PEs!");

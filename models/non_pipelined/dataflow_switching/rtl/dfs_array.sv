@@ -1,5 +1,6 @@
-// dfs_array.sv — 2D Systolic Array Grid for Single-Tenant Dataflow Switching
+// dfs_array.sv — 2D Systolic Array Grid for Single-Tenant Dataflow Switching (Non-Pipelined Variant)
 // Interconnects PEs in a clean 2D mesh (North->South and West->East).
+// 32-bit vertical partial-sum mesh.
 
 `timescale 1ns/1ps
 
@@ -13,11 +14,11 @@ module dfs_array #(
     input  logic                                rst_n,
 
     // Boundary data inputs (packed vectors)
-    input  logic [NUM_COLS*DATA_W-1:0]          din_n, // North streaming inputs
+    input  logic [NUM_COLS*ACC_W-1:0]           din_n, // North streaming inputs
     input  logic [NUM_ROWS*DATA_W-1:0]          din_w, // West streaming inputs
 
     // Boundary data outputs (packed vectors)
-    output logic [NUM_COLS*DATA_W-1:0]          dout_s, // South streaming outputs
+    output logic [NUM_COLS*ACC_W-1:0]           dout_s, // South streaming outputs
     output logic [NUM_ROWS*DATA_W-1:0]          dout_e, // East streaming outputs
 
     // Full precision accumulator outputs for all PEs (flattened: [row*NUM_COLS + col])
@@ -32,15 +33,15 @@ module dfs_array #(
 
     // Internal mesh wiring
     /* verilator lint_off UNOPTFLAT */
-    wire [DATA_W-1:0] mesh_n [NUM_ROWS-1:0][NUM_COLS-1:0];
+    wire [ACC_W-1:0]  mesh_n [NUM_ROWS-1:0][NUM_COLS-1:0];
     wire [DATA_W-1:0] mesh_w [NUM_ROWS-1:0][NUM_COLS-1:0];
-    wire [DATA_W-1:0] mesh_s [NUM_ROWS-1:0][NUM_COLS-1:0];
+    wire [ACC_W-1:0]  mesh_s [NUM_ROWS-1:0][NUM_COLS-1:0];
     wire [DATA_W-1:0] mesh_e [NUM_ROWS-1:0][NUM_COLS-1:0];
     /* verilator lint_on UNOPTFLAT */
 
     // North inputs: Row 0 from external din_n; row r from row r-1
     for (genvar c = 0; c < NUM_COLS; c++) begin : gen_north_in
-        assign mesh_n[0][c] = din_n[c*DATA_W +: DATA_W];
+        assign mesh_n[0][c] = din_n[c*ACC_W +: ACC_W];
         for (genvar r = 1; r < NUM_ROWS; r++) begin : gen_north_inner
             assign mesh_n[r][c] = mesh_s[r-1][c];
         end
@@ -61,7 +62,7 @@ module dfs_array #(
 
             dfs_pe #(
                 .DATA_W(DATA_W),
-                .ACC_W(ACC_W)
+                .ACC_W (ACC_W)
             ) u_pe (
                 .clk          (clk),
                 .rst_n        (rst_n),
@@ -82,7 +83,7 @@ module dfs_array #(
 
     // External outputs from array boundaries
     for (genvar c = 0; c < NUM_COLS; c++) begin : gen_ext_col_out
-        assign dout_s[c*DATA_W +: DATA_W] = mesh_s[NUM_ROWS-1][c];
+        assign dout_s[c*ACC_W +: ACC_W] = mesh_s[NUM_ROWS-1][c];
     end
 
     for (genvar r = 0; r < NUM_ROWS; r++) begin : gen_ext_row_out

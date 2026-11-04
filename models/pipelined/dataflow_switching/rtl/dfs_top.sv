@@ -19,9 +19,9 @@ module dfs_top #(
     input  logic                                tile_compute_en,   // Compute enable
 
     // Primary streaming interfaces (packed vectors)
-    input  logic [NUM_COLS*DATA_W-1:0]          din_n,
+    input  logic [NUM_COLS*ACC_W-1:0]           din_n,
     input  logic [NUM_ROWS*DATA_W-1:0]          din_w,
-    output logic [NUM_COLS*DATA_W-1:0]          dout_s,
+    output logic [NUM_COLS*ACC_W-1:0]           dout_s,
     output logic [NUM_ROWS*DATA_W-1:0]          dout_e,
 
     // Complete accumulator matrix output (packed flat: [row*NUM_COLS + col])

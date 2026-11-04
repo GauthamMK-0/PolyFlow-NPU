@@ -36,13 +36,13 @@ module sfa_top_16x16 #(
     input  logic [NUM_REGIONS-1:0]              acc_clr,
     input  logic [NUM_REGIONS-1:0]              compute_en,
 
-    // Mesh streaming data inputs (packed 16-element vectors)
-    input  logic [NUM_COLS*DATA_W-1:0]          din_n,
+    // Mesh streaming data inputs (packed)
+    input  logic [NUM_COLS*ACC_W-1:0]          din_n,
     input  logic [NUM_ROWS*DATA_W-1:0]          din_w_region_a,
     input  logic [NUM_ROWS*DATA_W-1:0]          din_w_region_b,
 
-    // Mesh streaming outputs (packed 16-element vectors)
-    output logic [NUM_COLS*DATA_W-1:0]          dout_s,
+    // Mesh streaming outputs (packed)
+    output logic [NUM_COLS*ACC_W-1:0]          dout_s,
     output logic [NUM_ROWS*DATA_W-1:0]          dout_e,
 
     // Accumulators matrix output (256 PEs * 32-bit = 8192-bit flat vector)

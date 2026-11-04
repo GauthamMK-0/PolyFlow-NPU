@@ -1,5 +1,6 @@
-// sfa_array.sv — 2D Systolic Array Grid with Hardware Boundary Isolation
+// sfa_array.sv — 2D Systolic Array Grid with Hardware Boundary Isolation (Non-Pipelined Variant)
 // Enforces boundary isolation: mesh lines crossing between distinct regions are zeroed.
+// 32-bit vertical partial-sum mesh.
 
 `timescale 1ns/1ps
 
@@ -13,13 +14,13 @@ module sfa_array #(
     input  logic                                rst_n,
 
     // Boundary data inputs (packed)
-    input  logic [NUM_COLS*DATA_W-1:0]          din_n,
+    input  logic [NUM_COLS*ACC_W-1:0]           din_n,
     input  logic [NUM_ROWS*DATA_W-1:0]          din_w,
     // Separate direct feed for Region B west boundary when split
     input  logic [NUM_ROWS*DATA_W-1:0]          din_w_region_b,
 
     // Boundary data outputs (packed)
-    output logic [NUM_COLS*DATA_W-1:0]          dout_s,
+    output logic [NUM_COLS*ACC_W-1:0]           dout_s,
     output logic [NUM_ROWS*DATA_W-1:0]          dout_e,
 
     // Full precision accumulator outputs for all PEs (packed flat: [row*NUM_COLS + col])
@@ -38,15 +39,15 @@ module sfa_array #(
 );
 
     /* verilator lint_off UNOPTFLAT */
-    wire [DATA_W-1:0] mesh_n [NUM_ROWS-1:0][NUM_COLS-1:0];
+    wire [ACC_W-1:0]  mesh_n [NUM_ROWS-1:0][NUM_COLS-1:0];
     wire [DATA_W-1:0] mesh_w [NUM_ROWS-1:0][NUM_COLS-1:0];
-    wire [DATA_W-1:0] mesh_s [NUM_ROWS-1:0][NUM_COLS-1:0];
+    wire [ACC_W-1:0]  mesh_s [NUM_ROWS-1:0][NUM_COLS-1:0];
     wire [DATA_W-1:0] mesh_e [NUM_ROWS-1:0][NUM_COLS-1:0];
     /* verilator lint_on UNOPTFLAT */
 
     // North inputs: Row 0 from external din_n; row r from row r-1
     for (genvar c = 0; c < NUM_COLS; c++) begin : gen_north_in
-        assign mesh_n[0][c] = din_n[c*DATA_W +: DATA_W];
+        assign mesh_n[0][c] = din_n[c*ACC_W +: ACC_W];
         for (genvar r = 1; r < NUM_ROWS; r++) begin : gen_north_inner
             assign mesh_n[r][c] = mesh_s[r-1][c];
         end
@@ -63,7 +64,8 @@ module sfa_array #(
     // Col c receives mesh_e from col c-1 UNLESS crossed region boundary (is_boundary_col[c])
     // If boundary is crossed, col c receives din_w_region_b for Region B!
     for (genvar r = 0; r < NUM_ROWS; r++) begin : gen_west_in
-        assign mesh_w[r][0] = din_w[r*DATA_W +: DATA_W];
+        assign mesh_w[r][0] = region_id_mask[0] ?
+                              din_w_region_b[r*DATA_W +: DATA_W] : din_w[r*DATA_W +: DATA_W];
         for (genvar c = 1; c < NUM_COLS; c++) begin : gen_west_inner
             assign mesh_w[r][c] = is_boundary_col[c] ?
                                   din_w_region_b[r*DATA_W +: DATA_W] : mesh_e[r][c-1];
@@ -80,7 +82,7 @@ module sfa_array #(
 
             sfa_pe #(
                 .DATA_W(DATA_W),
-                .ACC_W(ACC_W)
+                .ACC_W (ACC_W)
             ) u_pe (
                 .clk            (clk),
                 .rst_n          (rst_n),
@@ -115,7 +117,7 @@ module sfa_array #(
 
     // External outputs
     for (genvar c = 0; c < NUM_COLS; c++) begin : gen_ext_col_out
-        assign dout_s[c*DATA_W +: DATA_W] = mesh_s[NUM_ROWS-1][c];
+        assign dout_s[c*ACC_W +: ACC_W] = mesh_s[NUM_ROWS-1][c];
     end
 
     for (genvar r = 0; r < NUM_ROWS; r++) begin : gen_ext_row_out

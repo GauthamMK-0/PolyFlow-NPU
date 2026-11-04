@@ -41,12 +41,12 @@ module hdf_top #(
     input  logic [NUM_REGIONS-1:0]              acc_clr,
 
     // Mesh streaming data inputs (packed)
-    input  logic [NUM_COLS*DATA_W-1:0]          din_n,
+    input  logic [NUM_COLS*ACC_W-1:0]           din_n,
     input  logic [NUM_ROWS*DATA_W-1:0]          din_w_region_a,
     input  logic [NUM_ROWS*DATA_W-1:0]          din_w_region_b,
 
     // Mesh streaming outputs (packed)
-    output logic [NUM_COLS*DATA_W-1:0]          dout_s,
+    output logic [NUM_COLS*ACC_W-1:0]           dout_s,
     output logic [NUM_ROWS*DATA_W-1:0]          dout_e,
 
     // Complete accumulator output (packed flat: [row*NUM_COLS + col])

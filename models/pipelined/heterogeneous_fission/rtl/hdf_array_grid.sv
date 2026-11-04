@@ -1,5 +1,6 @@
 // hdf_array_grid.sv — 2D Systolic Array Grid with Dynamic Boundary Isolation & Heterogeneous Dataflows
 // Allows Region A and Region B to execute distinct dataflows simultaneously on the same physical mesh.
+// 32-bit vertical partial-sum mesh + registered systolic forward hops.
 
 `timescale 1ns/1ps
 
@@ -15,12 +16,13 @@ module hdf_array_grid #(
     input  logic                                rst_n,
 
     // Boundary data inputs (packed)
-    input  logic [NUM_COLS*DATA_W-1:0]          din_n,
+    // din_n carries 32-bit partial sums (WS mode) or 8-bit activations (OS mode)
+    input  logic [NUM_COLS*ACC_W-1:0]           din_n,
     input  logic [NUM_ROWS*DATA_W-1:0]          din_w_region_a,
     input  logic [NUM_ROWS*DATA_W-1:0]          din_w_region_b,
 
     // Boundary data outputs (packed)
-    output logic [NUM_COLS*DATA_W-1:0]          dout_s,
+    output logic [NUM_COLS*ACC_W-1:0]           dout_s,
     output logic [NUM_ROWS*DATA_W-1:0]          dout_e,
 
     // Full precision accumulator outputs for all PEs (packed flat: [row*NUM_COLS + col])
@@ -43,15 +45,15 @@ module hdf_array_grid #(
 );
 
     /* verilator lint_off UNOPTFLAT */
-    wire [DATA_W-1:0] mesh_n [NUM_ROWS-1:0][NUM_COLS-1:0];
+    wire [ACC_W-1:0]  mesh_n [NUM_ROWS-1:0][NUM_COLS-1:0];
     wire [DATA_W-1:0] mesh_w [NUM_ROWS-1:0][NUM_COLS-1:0];
-    wire [DATA_W-1:0] mesh_s [NUM_ROWS-1:0][NUM_COLS-1:0];
+    wire [ACC_W-1:0]  mesh_s [NUM_ROWS-1:0][NUM_COLS-1:0];
     wire [DATA_W-1:0] mesh_e [NUM_ROWS-1:0][NUM_COLS-1:0];
     /* verilator lint_on UNOPTFLAT */
 
     // North inputs: Row 0 from external din_n; row r from row r-1
     for (genvar c = 0; c < NUM_COLS; c++) begin : gen_north_in
-        assign mesh_n[0][c] = din_n[c*DATA_W +: DATA_W];
+        assign mesh_n[0][c] = din_n[c*ACC_W +: ACC_W];
         for (genvar r = 1; r < NUM_ROWS; r++) begin : gen_north_inner
             assign mesh_n[r][c] = mesh_s[r-1][c];
         end
@@ -123,7 +125,7 @@ module hdf_array_grid #(
 
     // External boundary outputs
     for (genvar c = 0; c < NUM_COLS; c++) begin : gen_ext_col_out
-        assign dout_s[c*DATA_W +: DATA_W] = mesh_s[NUM_ROWS-1][c];
+        assign dout_s[c*ACC_W +: ACC_W] = mesh_s[NUM_ROWS-1][c];
     end
 
     for (genvar r = 0; r < NUM_ROWS; r++) begin : gen_ext_row_out

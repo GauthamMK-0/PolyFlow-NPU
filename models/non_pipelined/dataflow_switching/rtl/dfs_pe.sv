@@ -1,5 +1,6 @@
-// dfs_pe.sv — Processing Element for Single-Tenant Dataflow Switching
+// dfs_pe.sv — Processing Element for Single-Tenant Dataflow Switching (Non-Pipelined Variant)
 // Supports runtime switching across Weight-Stationary (WS), Output-Stationary (OS), and Input-Stationary (IS).
+// 32-bit vertical partial-sum mesh.
 
 `timescale 1ns/1ps
 
@@ -11,9 +12,9 @@ module dfs_pe #(
     input  logic                    rst_n,
 
     // Directional streaming data ports
-    input  logic [DATA_W-1:0]       din_n, // Streams North -> South
-    input  logic [DATA_W-1:0]       din_w, // Streams West -> East
-    output logic [DATA_W-1:0]       dout_s,
+    input  logic [ACC_W-1:0]        din_n, // Streams North -> South (32 bits)
+    input  logic [DATA_W-1:0]       din_w, // Streams West -> East (8 bits)
+    output logic [ACC_W-1:0]        dout_s,
     output logic [DATA_W-1:0]       dout_e,
 
     // Full precision accumulator output
@@ -36,18 +37,16 @@ module dfs_pe #(
     logic [DATA_W-1:0] stat_operand_reg;
 
     // Stationary operand preload register
-    // WS: preloads filter weight from West port
-    // IS: preloads input activation from North port
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             stat_operand_reg <= '0;
         end else if (w_ld) begin
-            stat_operand_reg <= (dataflow_mode == DF_WS) ? din_w : din_n;
+            stat_operand_reg <= (dataflow_mode == DF_WS) ? din_w : din_n[DATA_W-1:0];
         end
     end
 
     // Operand selection and isolation
-    wire signed [DATA_W-1:0] mul_a = (dataflow_mode == DF_OS) ? $signed(din_n) : $signed(stat_operand_reg);
+    wire signed [DATA_W-1:0] mul_a = (dataflow_mode == DF_OS) ? $signed(din_n[DATA_W-1:0]) : $signed(stat_operand_reg);
     wire signed [DATA_W-1:0] mul_b = $signed(din_w);
     logic signed [2*DATA_W-1:0] product;
     logic signed [ACC_W-1:0]    product_sext;
@@ -56,17 +55,15 @@ module dfs_pe #(
     assign product_sext = {{ (ACC_W - 2*DATA_W){product[2*DATA_W-1]} }, product};
 
     wire do_accumulate   = compute_en;
-
-    // Non-Pipelined Combinational MAC (No accumulator registers)
     wire _unused_acc = &{1'b0, acc_clr};
 
-    // Systolic forward passing:
-    // In WS mode during weight preload (w_ld=1), dout_e shifts out the registered operand,
-    // forming a West-to-East shift chain across columns so each PE receives its distinct weight W[r, c].
-    // During compute (w_ld=0), dout_e broadcasts input activation West-to-East across row r.
-    // In IS mode during input preload, dout_s shifts stat_operand_reg North-to-South down columns.
-    assign dout_s  = (w_ld && (dataflow_mode == DF_IS)) ? stat_operand_reg : din_n;
+    wire signed [ACC_W-1:0] psum_comb = $signed(din_n) + product_sext;
+
+    // Forward passing
     assign dout_e  = (w_ld && (dataflow_mode == DF_WS)) ? stat_operand_reg : din_w;
-    assign acc_out = do_accumulate ? product_sext : '0;
+    assign dout_s  = (w_ld && (dataflow_mode == DF_IS)) ? {{ (ACC_W-DATA_W){1'b0} }, stat_operand_reg} :
+                     (dataflow_mode == DF_OS) ? din_n : psum_comb;
+
+    assign acc_out = do_accumulate ? ((dataflow_mode == DF_OS || dataflow_mode == DF_IS) ? product_sext : psum_comb) : '0;
 
 endmodule

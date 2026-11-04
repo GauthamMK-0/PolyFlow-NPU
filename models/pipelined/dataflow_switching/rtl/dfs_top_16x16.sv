@@ -18,10 +18,10 @@ module dfs_top_16x16 #(
     input  logic                                tile_acc_clr,      // Clear accumulators
     input  logic                                tile_compute_en,   // Compute enable
 
-    // Primary streaming interfaces (packed 16-element vectors)
-    input  logic [NUM_COLS*DATA_W-1:0]          din_n,
+    // Primary streaming interfaces (packed)
+    input  logic [NUM_COLS*ACC_W-1:0]           din_n,
     input  logic [NUM_ROWS*DATA_W-1:0]          din_w,
-    output logic [NUM_COLS*DATA_W-1:0]          dout_s,
+    output logic [NUM_COLS*ACC_W-1:0]           dout_s,
     output logic [NUM_ROWS*DATA_W-1:0]          dout_e,
 
     // Complete 16x16 accumulator matrix output (256 PEs * 32-bit = 8192-bit flat vector)

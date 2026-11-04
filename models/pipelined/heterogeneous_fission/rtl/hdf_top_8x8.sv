@@ -41,13 +41,13 @@ module hdf_top_8x8 #(
     input  logic [NUM_REGIONS-1:0]              w_ld,
     input  logic [NUM_REGIONS-1:0]              acc_clr,
 
-    // Mesh streaming data inputs (packed 8-element vectors)
-    input  logic [NUM_COLS*DATA_W-1:0]          din_n,
+    // Mesh streaming data inputs (packed)
+    input  logic [NUM_COLS*ACC_W-1:0]          din_n,
     input  logic [NUM_ROWS*DATA_W-1:0]          din_w_region_a,
     input  logic [NUM_ROWS*DATA_W-1:0]          din_w_region_b,
 
-    // Mesh streaming outputs (packed 8-element vectors)
-    output logic [NUM_COLS*DATA_W-1:0]          dout_s,
+    // Mesh streaming outputs (packed)
+    output logic [NUM_COLS*ACC_W-1:0]          dout_s,
     output logic [NUM_ROWS*DATA_W-1:0]          dout_e,
 
     // Accumulators matrix output (64 PEs * 32-bit = 2048-bit flat vector)

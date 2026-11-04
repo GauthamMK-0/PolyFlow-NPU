@@ -18,10 +18,10 @@ module dfs_top_tb;
     logic                               tile_acc_clr;
     logic                               tile_compute_en;
 
-    logic [NUM_COLS*DATA_W-1:0]         din_n;
+    logic [NUM_COLS*ACC_W-1:0]         din_n;
     logic [NUM_ROWS*DATA_W-1:0]         din_w;
     /* verilator lint_off UNUSEDSIGNAL */
-    wire  [NUM_COLS*DATA_W-1:0]         dout_s;
+    wire  [NUM_COLS*ACC_W-1:0]         dout_s;
     wire  [NUM_ROWS*DATA_W-1:0]         dout_e;
     /* verilator lint_on UNUSEDSIGNAL */
     wire  [NUM_ROWS*NUM_COLS*ACC_W-1:0] acc_out_flat;
@@ -34,8 +34,8 @@ module dfs_top_tb;
     endfunction
 
     // Helper to set din_n for column c
-    task automatic set_din_n(int c, logic [DATA_W-1:0] val);
-        din_n[c*DATA_W +: DATA_W] = val;
+    task automatic set_din_n(int c, logic [ACC_W-1:0] val);
+        din_n[c*ACC_W +: ACC_W] = val;
     endtask
 
     // Helper to set din_w for row r
@@ -115,20 +115,21 @@ module dfs_top_tb;
         end
         tile_w_ld = 0;
 
-        // Step 1.2: Stream activation inputs through West port and accumulate (4 cycles of act = 3)
+        // Step 1.2: Stream activation inputs through West port (systolic wave propagation)
         tile_compute_en = 1;
         for (int r = 0; r < NUM_ROWS; r++) begin
             set_din_w(r, 8'd3); // Activation = 3
         end
-        repeat (4) step_clk();
+        repeat (NUM_ROWS + NUM_COLS + 2) step_clk();
         tile_compute_en = 0;
         step_clk(); // drain pipeline stage
 
-        $display("WS Mode: PE[0][0] = %0d (Exp: %0d), PE[0][%0d] = %0d (Exp: %0d)",
-                 get_pe_acc(0,0), 12*(5+0), NUM_COLS-1, get_pe_acc(0,NUM_COLS-1), 12*(5+NUM_COLS-1));
+        $display("WS Mode: PE[0][0] = %0d (Exp: %0d), PE[%0d][%0d] = %0d (Exp: %0d)",
+                 get_pe_acc(0,0), 1*3*(5+0), NUM_ROWS-1, NUM_COLS-1,
+                 get_pe_acc(NUM_ROWS-1, NUM_COLS-1), NUM_ROWS*3*(5+NUM_COLS-1));
         for (int r = 0; r < NUM_ROWS; r++) begin
             for (int c = 0; c < NUM_COLS; c++) begin
-                exp_val = 32'd12 * (32'd5 + c);
+                exp_val = (r + 1) * 32'd3 * (32'd5 + c);
                 if (get_pe_acc(r, c) !== exp_val) begin
                     $display("ERROR: WS Mode mismatch at PE[%0d][%0d]: %0d (Expected: %0d)", r, c, get_pe_acc(r, c), exp_val);
                     error_count++;
@@ -152,17 +153,17 @@ module dfs_top_tb;
         // In OS mode, operands stream simultaneously from North (Q) and West (K)
         tile_compute_en = 1;
         // Cycle 1: Q=4, K=7 -> prod = 28
-        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 8'd4);
+        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 32'd4);
         for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd7);
         step_clk();
 
         // Cycle 2: Q=2, K=6 -> prod = 12 -> acc = 28 + 12 = 40
-        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 8'd2);
+        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 32'd2);
         for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd6);
         step_clk();
 
         // Cycle 3: Q=3, K=5 -> prod = 15 -> acc = 40 + 15 = 55
-        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 8'd3);
+        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 32'd3);
         for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd5);
         step_clk();
         tile_compute_en = 0;
@@ -187,7 +188,7 @@ module dfs_top_tb;
 
         // Preload activation from North
         tile_w_ld = 1;
-        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 8'd6); // Stationary activation = 6
+        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 32'd6); // Stationary activation = 6
         step_clk();
         tile_w_ld = 0;
 

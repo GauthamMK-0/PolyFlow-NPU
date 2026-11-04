@@ -1,5 +1,6 @@
 // sfa_pe.sv — Processing Element for Homogeneous Spatial Fission Model
 // Pinned to Weight-Stationary (WS) dataflow (Planaria-style architecture).
+// 32-bit vertical partial-sum mesh + registered systolic forward hops.
 
 `timescale 1ns/1ps
 
@@ -11,9 +12,10 @@ module sfa_pe #(
     input  logic                    rst_n,
 
     // Directional streaming data ports
-    input  logic [DATA_W-1:0]       din_n, // Streams North -> South
-    input  logic [DATA_W-1:0]       din_w, // Streams West -> East
-    output logic [DATA_W-1:0]       dout_s,
+    // din_n / dout_s carry 32-bit partial sums down columns
+    input  logic [ACC_W-1:0]        din_n, // Streams North -> South (32 bits)
+    input  logic [DATA_W-1:0]       din_w, // Streams West -> East (8 bits)
+    output logic [ACC_W-1:0]        dout_s,
     output logic [DATA_W-1:0]       dout_e,
 
     // Full precision accumulator output
@@ -78,49 +80,38 @@ module sfa_pe #(
 
     wire signed [ACC_W-1:0] product_sext = {{ (ACC_W - 2*DATA_W){product_reg[2*DATA_W-1]} }, product_reg};
 
-    // --- Stage 2: Redundant Carry-Save Accumulator (CSA) ---
-    logic [ACC_W-1:0] acc_sum;
-    logic [ACC_W-1:0] acc_carry;
-
-    wire [ACC_W-1:0] next_csa_sum;
-    wire [ACC_W-1:0] next_csa_carry;
-
-    genvar i;
-    generate
-        for (i = 0; i < ACC_W; i++) begin : gen_csa
-            wire a_bit = acc_sum[i];
-            wire b_bit = acc_carry[i];
-            wire c_bit = product_sext[i];
-
-            assign next_csa_sum[i] = a_bit ^ b_bit ^ c_bit;
-            if (i < ACC_W-1) begin : gen_csa_carry
-                assign next_csa_carry[i+1] = (a_bit & b_bit) | (b_bit & c_bit) | (a_bit & c_bit);
-            end
-        end
-    endgenerate
-    assign next_csa_carry[0] = 1'b0;
+    // --- Stage 2: Partial Sum Addition ---
+    wire signed [ACC_W-1:0] psum_next = $signed(din_n) + product_sext;
+    logic [ACC_W-1:0]       acc_reg;
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            acc_sum   <= '0;
-            acc_carry <= '0;
+            acc_reg <= '0;
         end else if (acc_clr) begin
-            acc_sum   <= '0;
-            acc_carry <= '0;
+            acc_reg <= '0;
         end else if (compute_pipe) begin
-            acc_sum   <= next_csa_sum;
-            acc_carry <= next_csa_carry;
+            acc_reg <= psum_next;
         end
     end
 
-    // Systolic forward passing:
-    // In WS mode during weight preload (w_ld=1), dout_e shifts out the registered weight,
-    // forming a West-to-East shift chain across columns so each PE receives its distinct weight W[r, c].
-    // During compute (w_ld=0), dout_e broadcasts input activation West-to-East across row r.
-    assign dout_s  = din_n;
-    assign dout_e  = (w_ld && !bank_role_stale) ? stat_weight : din_w;
+    // --- Registered Systolic Inter-PE Forwarding ---
+    logic [DATA_W-1:0] din_w_reg;
+
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            din_w_reg <= '0;
+            dout_s    <= '0;
+        end else begin
+            din_w_reg <= din_w;
+            // Vertical 32-bit partial sum forwarded South
+            dout_s    <= psum_next;
+        end
+    end
+
+    // Horizontal shift during preload, activation forward during compute
+    assign dout_e = (w_ld && !bank_role_stale) ? stat_weight : din_w_reg;
 
     // Resolved accumulator output
-    assign acc_out = acc_sum + acc_carry;
+    assign acc_out = acc_reg;
 
 endmodule

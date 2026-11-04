@@ -1,5 +1,6 @@
-// sfa_pe.sv — Processing Element for Homogeneous Spatial Fission Model
+// sfa_pe.sv — Processing Element for Homogeneous Spatial Fission Model (Non-Pipelined Variant)
 // Pinned to Weight-Stationary (WS) dataflow (Planaria-style architecture).
+// 32-bit vertical partial-sum mesh.
 
 `timescale 1ns/1ps
 
@@ -11,9 +12,9 @@ module sfa_pe #(
     input  logic                    rst_n,
 
     // Directional streaming data ports
-    input  logic [DATA_W-1:0]       din_n, // Streams North -> South
-    input  logic [DATA_W-1:0]       din_w, // Streams West -> East
-    output logic [DATA_W-1:0]       dout_s,
+    input  logic [ACC_W-1:0]        din_n, // Streams North -> South (32 bits)
+    input  logic [DATA_W-1:0]       din_w, // Streams West -> East (8 bits)
+    output logic [ACC_W-1:0]        dout_s,
     output logic [DATA_W-1:0]       dout_e,
 
     // Full precision accumulator output
@@ -63,16 +64,13 @@ module sfa_pe #(
     assign product_sext = {{ (ACC_W - 2*DATA_W){product[2*DATA_W-1]} }, product};
 
     wire do_accumulate   = compute_active;
-
-    // Non-Pipelined Combinational MAC (No accumulator registers)
     wire _unused_acc = &{1'b0, acc_clr};
 
-    // Systolic forward passing:
-    // In WS mode during weight preload (w_ld=1), dout_e shifts out the registered weight,
-    // forming a West-to-East shift chain across columns so each PE receives its distinct weight W[r, c].
-    // During compute (w_ld=0), dout_e broadcasts input activation West-to-East across row r.
-    assign dout_s  = din_n;
+    wire signed [ACC_W-1:0] psum_comb = $signed(din_n) + product_sext;
+
+    // Forward passing
     assign dout_e  = (w_ld && !bank_role_stale) ? stat_weight : din_w;
-    assign acc_out = do_accumulate ? product_sext : '0;
+    assign dout_s  = psum_comb;
+    assign acc_out = do_accumulate ? psum_comb : '0;
 
 endmodule
