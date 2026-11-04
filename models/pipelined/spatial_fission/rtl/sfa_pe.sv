@@ -113,9 +113,12 @@ module sfa_pe #(
         end
     end
 
-    // Systolic forward passing
+    // Systolic forward passing:
+    // In WS mode during weight preload (w_ld=1), dout_e shifts out the registered weight,
+    // forming a West-to-East shift chain across columns so each PE receives its distinct weight W[r, c].
+    // During compute (w_ld=0), dout_e broadcasts input activation West-to-East across row r.
     assign dout_s  = din_n;
-    assign dout_e  = din_w;
+    assign dout_e  = (w_ld && !bank_role_stale) ? stat_weight : din_w;
 
     // Resolved accumulator output
     assign acc_out = acc_sum + acc_carry;

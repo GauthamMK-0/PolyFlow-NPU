@@ -22,7 +22,7 @@ module cosim_model3_hdf_tb;
 
     localparam int DATA_W      = 8;
     localparam int ACC_W       = 32;
-    localparam int LIFETIME_W  = 4;
+    localparam int LIFETIME_W  = 8;
     localparam int NUM_ROWS    = `NUM_ROWS;
     localparam int NUM_COLS    = `NUM_COLS;
     localparam int K_STEPS     = `K_STEPS;

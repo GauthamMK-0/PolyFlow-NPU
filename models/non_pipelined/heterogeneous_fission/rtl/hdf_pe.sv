@@ -46,7 +46,7 @@ module hdf_pe #(
 
     logic [DATA_W-1:0]     stat_operand_reg;
     logic [LIFETIME_W-1:0] lifetime_cnt;
-    wire                   lifetime_active = (lifetime_cnt != '0);
+    wire                   lifetime_active = (lifetime_cnt != '0) || lifetime_ld;
     wire                   mac_en = lifetime_active && !bank_role_stale;
 
     // Lifetime counter countdown
@@ -94,9 +94,13 @@ module hdf_pe #(
     // Non-Pipelined Combinational MAC (No accumulator registers)
     wire _unused_acc = &{1'b0, acc_clr};
 
-    // Systolic forward passing
-    assign dout_s  = din_n;
-    assign dout_e  = din_w;
+    // Systolic forward passing:
+    // In WS mode during weight preload (w_ld=1), dout_e shifts out the registered operand,
+    // forming a West-to-East shift chain across columns so each PE receives its distinct weight W[r, c].
+    // During compute (w_ld=0), dout_e broadcasts input activation West-to-East across row r.
+    // In IS mode during input preload, dout_s shifts stat_operand_reg North-to-South down columns.
+    assign dout_s  = (w_ld && (dataflow_mode == DF_IS) && !bank_role_stale) ? stat_operand_reg : din_n;
+    assign dout_e  = (w_ld && (dataflow_mode == DF_WS) && !bank_role_stale) ? stat_operand_reg : din_w;
     assign acc_out = compute_active ? product_sext : '0;
 
 endmodule

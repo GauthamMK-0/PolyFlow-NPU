@@ -6,7 +6,7 @@
 module hdf_top_16x16 #(
     parameter int DATA_W      = 8,
     parameter int ACC_W       = 32,
-    parameter int LIFETIME_W  = 5,
+    parameter int LIFETIME_W  = 8,
     parameter int NUM_ROWS    = 16,
     parameter int NUM_COLS    = 16,
     parameter int NUM_BANKS   = 4,

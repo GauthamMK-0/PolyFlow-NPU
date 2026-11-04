@@ -106,9 +106,13 @@ module dfs_pe #(
         end
     end
 
-    // Systolic forward passing (N -> S, W -> E)
-    assign dout_s  = din_n;
-    assign dout_e  = din_w;
+    // Systolic forward passing:
+    // In WS mode during weight preload (w_ld=1), dout_e shifts out the registered operand,
+    // forming a West-to-East shift chain across columns so each PE receives its distinct weight W[r, c].
+    // During compute (w_ld=0), dout_e broadcasts input activation West-to-East across row r.
+    // In IS mode during input preload, dout_s shifts stat_operand_reg North-to-South down columns.
+    assign dout_s  = (w_ld && (dataflow_mode == DF_IS)) ? stat_operand_reg : din_n;
+    assign dout_e  = (w_ld && (dataflow_mode == DF_WS)) ? stat_operand_reg : din_w;
 
     // Resolved accumulator output
     assign acc_out = acc_sum + acc_carry;

@@ -67,9 +67,12 @@ module sfa_pe #(
     // Non-Pipelined Combinational MAC (No accumulator registers)
     wire _unused_acc = &{1'b0, acc_clr};
 
-    // Systolic forward passing
+    // Systolic forward passing:
+    // In WS mode during weight preload (w_ld=1), dout_e shifts out the registered weight,
+    // forming a West-to-East shift chain across columns so each PE receives its distinct weight W[r, c].
+    // During compute (w_ld=0), dout_e broadcasts input activation West-to-East across row r.
     assign dout_s  = din_n;
-    assign dout_e  = din_w;
+    assign dout_e  = (w_ld && !bank_role_stale) ? stat_weight : din_w;
     assign acc_out = do_accumulate ? product_sext : '0;
 
 endmodule
