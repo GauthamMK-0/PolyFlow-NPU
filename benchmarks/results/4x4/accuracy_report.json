@@ -1,26 +1,6 @@
 [
   {
-    "label": "Model 1: ResNet-50 CNN (Weight-Stationary)",
-    "total_elements": 16,
-    "matching_elements": 16,
-    "match_rate_pct": 100.0,
-    "mae": 0.0,
-    "mse": 0.0,
-    "cosine_similarity": 1.0,
-    "status": "PASS (Bit-Exact 100%)"
-  },
-  {
-    "label": "Model 1: ViT Attention (Output-Stationary)",
-    "total_elements": 16,
-    "matching_elements": 16,
-    "match_rate_pct": 100.0,
-    "mae": 0.0,
-    "mse": 0.0,
-    "cosine_similarity": 0.9999999999999998,
-    "status": "PASS (Bit-Exact 100%)"
-  },
-  {
-    "label": "Model 2: Planaria Region A (CNN Native WS)",
+    "label": "Model 1: Tenant A ResNet-50 CNN (Weight-Stationary)",
     "total_elements": 8,
     "matching_elements": 8,
     "match_rate_pct": 100.0,
@@ -30,13 +10,33 @@
     "status": "PASS (Bit-Exact 100%)"
   },
   {
-    "label": "Model 3: PolyFlow-NPU Concurrent Execution (Region A: WS + Region B: OS)",
+    "label": "Model 1: Tenant B ViT Attention (Output-Stationary)",
+    "total_elements": 8,
+    "matching_elements": 8,
+    "match_rate_pct": 100.0,
+    "mae": 0.0,
+    "mse": 0.0,
+    "cosine_similarity": 1.0,
+    "status": "PASS (Bit-Exact 100%)"
+  },
+  {
+    "label": "Model 2: Planaria Multi-Tenant (Reg A: WS + Reg B: Forced WS)",
     "total_elements": 16,
     "matching_elements": 16,
     "match_rate_pct": 100.0,
     "mae": 0.0,
     "mse": 0.0,
-    "cosine_similarity": 1.0,
+    "cosine_similarity": 0.9999999999999998,
+    "status": "PASS (Bit-Exact 100%)"
+  },
+  {
+    "label": "Model 3: PolyFlow-NPU Multi-Tenant (Reg A: WS + Reg B: Native OS)",
+    "total_elements": 16,
+    "matching_elements": 16,
+    "match_rate_pct": 100.0,
+    "mae": 0.0,
+    "mse": 0.0,
+    "cosine_similarity": 0.9999999999999998,
     "status": "PASS (Bit-Exact 100%)"
   }
 ]

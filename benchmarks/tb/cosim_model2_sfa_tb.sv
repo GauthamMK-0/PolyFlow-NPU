@@ -86,6 +86,8 @@ module cosim_model2_sfa_tb;
     int end_cycle_reg_a = 0;
     int end_cycle_reg_b = 0;
     int total_active_macs = 0;
+    int reg_a_cycle = 0;
+    bit reg_a_done = 0;
 
     function automatic logic signed [ACC_W-1:0] get_pe_acc(int r, int c);
         return acc_out_flat[(r*NUM_COLS + c)*ACC_W +: ACC_W];
@@ -221,49 +223,72 @@ module cosim_model2_sfa_tb;
         w_ld[0] = 1'b0;
 
         // Cycles: Execute Region A (CNN in Native WS) and Region B (ViT Attention Forced into WS)
-        for (int t = 0; t < 2 * K_STEPS; t++) begin
-            // --- Region A (CNN in Native WS) ---
-            if (t < K_STEPS) begin
-                // Stream K_STEPS CNN activations
-                compute_en[0] = 1'b1;
-                for (int r = 0; r < NUM_ROWS; r++) begin
-                    set_din_w_a(r, cnn_inputs_mem[t][r]);
-                end
-                total_active_macs += (NUM_ROWS * HALF_COLS);
-            end else if (t == K_STEPS) begin
-                // Region A drain pipeline stage
-                compute_en[0]  = 1'b0;
-                din_w_region_a = '0;
-                end_cycle_reg_a = cycle_count;
-                $display("Region A (CNN Native WS) Completed: %0d cycles", (end_cycle_reg_a - start_cycle_total));
-            end else begin
-                // Region A idle while waiting for Region B
-                compute_en[0]  = 1'b0;
-                din_w_region_a = '0;
-            end
+        reg_a_cycle = 0;
+        reg_a_done = 0;
 
-            // --- Region B (ViT Attention Forced into WS on sfa_pe) ---
-            if ((t % 2) == 0) begin
-                // Even step (t = 2k): Must reload non-stationary key vector K[k][r] into stat_weight
+        for (int k = 0; k < K_STEPS; k++) begin
+            // Region B: Step k requires shifting Q[k] across HALF_COLS columns, then 1 compute cycle with K[k]
+            for (int s = HALF_COLS - 1; s >= 0; s--) begin
+                // Region B shift sub-cycle
                 w_ld[1]       = 1'b1;
                 compute_en[1] = 1'b0;
                 for (int r = 0; r < NUM_ROWS; r++) begin
-                    set_din_w_b(r, vit_k_mem[t/2][r]);
+                    set_din_w_b(r, vit_q_mem[k][HALF_COLS + s]);
                 end
-            end else begin
-                // Odd step (t = 2k+1): Multiply stat_weight (K[k][r]) by Q[k]
-                w_ld[1]       = 1'b0;
-                compute_en[1] = 1'b1;
+
+                // Region A concurrent execution
+                if (reg_a_cycle < K_STEPS) begin
+                    compute_en[0] = 1'b1;
+                    for (int r = 0; r < NUM_ROWS; r++) begin
+                        set_din_w_a(r, cnn_inputs_mem[reg_a_cycle][r]);
+                    end
+                    total_active_macs += (NUM_ROWS * HALF_COLS);
+                    reg_a_cycle++;
+                end else begin
+                    compute_en[0]  = 1'b0;
+                    din_w_region_a = '0;
+                end
+
+                step_clk();
+
+                if (reg_a_cycle >= K_STEPS && !reg_a_done) begin
+                    reg_a_done = 1;
+                    end_cycle_reg_a = cycle_count;
+                    $display("Region A (CNN Native WS) Completed: %0d cycles", (end_cycle_reg_a - start_cycle_total));
+                end
+            end
+
+            // Region B compute sub-cycle (1 cycle MAC)
+            w_ld[1]       = 1'b0;
+            compute_en[1] = 1'b1;
+            for (int r = 0; r < NUM_ROWS; r++) begin
+                set_din_w_b(r, vit_k_mem[k][r]);
+            end
+            total_active_macs += (NUM_ROWS * HALF_COLS);
+
+            // Region A concurrent execution
+            if (reg_a_cycle < K_STEPS) begin
+                compute_en[0] = 1'b1;
                 for (int r = 0; r < NUM_ROWS; r++) begin
-                    set_din_w_b(r, vit_q_mem[t/2][HALF_COLS]);
+                    set_din_w_a(r, cnn_inputs_mem[reg_a_cycle][r]);
                 end
                 total_active_macs += (NUM_ROWS * HALF_COLS);
+                reg_a_cycle++;
+            end else begin
+                compute_en[0]  = 1'b0;
+                din_w_region_a = '0;
             end
 
             step_clk();
+
+            if (reg_a_cycle >= K_STEPS && !reg_a_done) begin
+                reg_a_done = 1;
+                end_cycle_reg_a = cycle_count;
+                $display("Region A (CNN Native WS) Completed: %0d cycles", (end_cycle_reg_a - start_cycle_total));
+            end
         end
 
-        // Final 1-cycle pipeline drain for Region B's last product (t = 2K-1)
+        // Final 1-cycle pipeline drain for Region B
         w_ld           = 2'b00;
         compute_en     = 2'b00;
         din_w_region_a = '0;

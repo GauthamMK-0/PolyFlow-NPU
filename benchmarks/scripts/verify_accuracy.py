@@ -82,8 +82,8 @@ def verify_scale(scale_name):
     with open(golden_json_path, "r") as f:
         golden_data = json.load(f)
 
-    golden_m1_cnn = np.array(golden_data["m1_cnn_solo"], dtype=np.int32)
-    golden_m1_vit = np.array(golden_data["m1_vit_solo"], dtype=np.int32)
+    golden_reg_a = np.array(golden_data["region_a_cnn"], dtype=np.int32)
+    golden_reg_b = np.array(golden_data["region_b_vit"], dtype=np.int32)
     golden_combined = np.array(golden_data["combined_multitenant"], dtype=np.int32)
 
     hw_m1_cnn = load_matrix_txt(os.path.join(results_dir, "m1_cnn_hw_output.txt"))
@@ -98,28 +98,25 @@ def verify_scale(scale_name):
     all_passed = True
     scale_stats = []
 
-    # 1. Model 1 CNN Solo Verification
-    p1, s1 = evaluate_accuracy(hw_m1_cnn, golden_m1_cnn, "Model 1: ResNet-50 CNN (Weight-Stationary)")
+    # 1. Model 1 Tenant A (CNN Solo WS)
+    p1, s1 = evaluate_accuracy(hw_m1_cnn, golden_reg_a, "Model 1: Tenant A ResNet-50 CNN (Weight-Stationary)")
     all_passed = all_passed and p1
     if s1: scale_stats.append(s1)
 
-    # 2. Model 1 ViT Solo Verification
-    p2, s2 = evaluate_accuracy(hw_m1_vit, golden_m1_vit, "Model 1: ViT Attention (Output-Stationary)")
+    # 2. Model 1 Tenant B (ViT Solo OS)
+    p2, s2 = evaluate_accuracy(hw_m1_vit, golden_reg_b, "Model 1: Tenant B ViT Attention (Output-Stationary)")
     all_passed = all_passed and p2
     if s2: scale_stats.append(s2)
 
-    # 3. Model 2 Multi-Tenant Region A (CNN Native WS)
-    half_cols = golden_data["cols"] // 2
-    golden_reg_a = golden_m1_cnn[:, :half_cols]
-    hw_m2_reg_a = hw_m2_combined[:, :half_cols] if hw_m2_combined is not None else None
-    p2a, s2a = evaluate_accuracy(hw_m2_reg_a, golden_reg_a, "Model 2: Planaria Region A (CNN Native WS)")
-    all_passed = all_passed and p2a
-    if s2a: scale_stats.append(s2a)
-
-    # 4. Model 3 Multi-Tenant Concurrent Execution Verification (100% Bit-Exact across both regions)
-    p3, s3 = evaluate_accuracy(hw_m3_combined, golden_combined, "Model 3: PolyFlow-NPU Concurrent Execution (Region A: WS + Region B: OS)")
+    # 3. Model 2 Multi-Tenant Co-Execution (Full Array: Region A + Region B)
+    p3, s3 = evaluate_accuracy(hw_m2_combined, golden_combined, "Model 2: Planaria Multi-Tenant (Reg A: WS + Reg B: Forced WS)")
     all_passed = all_passed and p3
     if s3: scale_stats.append(s3)
+
+    # 4. Model 3 Multi-Tenant Co-Execution (Full Array: Region A + Region B)
+    p4, s4 = evaluate_accuracy(hw_m3_combined, golden_combined, "Model 3: PolyFlow-NPU Multi-Tenant (Reg A: WS + Reg B: Native OS)")
+    all_passed = all_passed and p4
+    if s4: scale_stats.append(s4)
 
     # Dump verification summary JSON
     with open(os.path.join(results_dir, "accuracy_report.json"), "w") as f:

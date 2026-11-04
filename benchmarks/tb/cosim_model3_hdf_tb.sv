@@ -231,8 +231,9 @@ module cosim_model3_hdf_tb;
         // Concurrent streaming execution (K_STEPS cycles)
         // Region A streams activations from West (WS)
         // Region B streams Q from North and K from West simultaneously (OS)
+        // Pulse lifetime_ld on cycle 0 to load exact countdown window (Issue 6 fix)
+        lifetime_init = {K_STEPS[7:0], K_STEPS[7:0]};
         lifetime_ld   = 2'b11;
-        lifetime_init = {8'd255, 8'd255};
         for (int k = 0; k < K_STEPS; k++) begin
             for (int r = 0; r < NUM_ROWS; r++) begin
                 set_din_w_a(r, cnn_inputs_mem[k][r]);
@@ -242,6 +243,7 @@ module cosim_model3_hdf_tb;
                 set_din_n(c, vit_q_mem[k][c]);   // Q into Region B
             end
             step_clk();
+            lifetime_ld = 2'b00; // Deassert after cycle 0 so lifetime_cnt counts down dynamically
             total_active_macs += (NUM_ROWS * HALF_COLS); // Region A active
             total_active_macs += (NUM_ROWS * HALF_COLS); // Region B active
         end

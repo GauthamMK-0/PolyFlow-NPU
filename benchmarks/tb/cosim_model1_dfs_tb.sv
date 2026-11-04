@@ -137,9 +137,9 @@ module cosim_model1_dfs_tb;
         step_clk();
         tile_acc_clr      = 0;
 
-        // Preload stationary weights: shift West-to-East across all NUM_COLS columns
+        // Preload stationary weights: shift West-to-East across HALF_COLS columns
         tile_w_ld = 1;
-        for (int step = NUM_COLS - 1; step >= 0; step--) begin
+        for (int step = HALF_COLS - 1; step >= 0; step--) begin
             for (int r = 0; r < NUM_ROWS; r++) begin
                 set_din_w(r, cnn_weights_mem[r][step]);
             end
@@ -154,7 +154,7 @@ module cosim_model1_dfs_tb;
                 set_din_w(r, cnn_inputs_mem[k][r]);
             end
             step_clk();
-            total_active_macs += (NUM_ROWS * NUM_COLS);
+            total_active_macs += (NUM_ROWS * HALF_COLS);
         end
 
         // Cycle K+3: Drain final product register into accumulator
@@ -165,10 +165,10 @@ module cosim_model1_dfs_tb;
         end_cycle_cnn = cycle_count;
         $display("Tenant A (CNN Solo WS) Completed: %0d cycles", (end_cycle_cnn - start_cycle_cnn));
 
-        // Dump CNN solo output to result file
+        // Dump CNN solo output to result file (NUM_ROWS x HALF_COLS)
         fp = $fopen({"benchmarks/results/", `SCALE_NAME, "/m1_cnn_hw_output.txt"}, "w");
         for (int r = 0; r < NUM_ROWS; r++) begin
-            for (int c = 0; c < NUM_COLS; c++) begin
+            for (int c = 0; c < HALF_COLS; c++) begin
                 $fwrite(fp, "%0d ", get_pe_acc(r, c));
             end
             $fwrite(fp, "\n");
@@ -187,17 +187,20 @@ module cosim_model1_dfs_tb;
         tile_acc_clr      = 0;
 
         // Cycles 2 .. K+1: Stream ViT Q and K vectors (K_STEPS cycles)
-        // Tenant B requires NUM_ROWS x HALF_COLS outputs.
+        // Tenant B computes NUM_ROWS x HALF_COLS outputs in cols [HALF_COLS..NUM_COLS-1].
         tile_compute_en = 1;
         for (int k = 0; k < K_STEPS; k++) begin
-            for (int c = 0; c < NUM_COLS; c++) begin
+            for (int c = 0; c < HALF_COLS; c++) begin
+                set_din_n(c, 8'd0);
+            end
+            for (int c = HALF_COLS; c < NUM_COLS; c++) begin
                 set_din_n(c, vit_q_mem[k][c]);
             end
             for (int r = 0; r < NUM_ROWS; r++) begin
                 set_din_w(r, vit_k_mem[k][r]);
             end
             step_clk();
-            total_active_macs += (NUM_ROWS * NUM_COLS);
+            total_active_macs += (NUM_ROWS * HALF_COLS);
         end
 
         // Cycle K+2: Drain final product register into accumulator
@@ -209,10 +212,10 @@ module cosim_model1_dfs_tb;
         end_cycle_vit = cycle_count;
         $display("Tenant B (ViT Solo OS) Completed: %0d cycles (Finish time: %0d)", (end_cycle_vit - start_cycle_vit), end_cycle_vit);
 
-        // Dump ViT solo output
+        // Dump ViT solo output (NUM_ROWS x HALF_COLS)
         fp = $fopen({"benchmarks/results/", `SCALE_NAME, "/m1_vit_hw_output.txt"}, "w");
         for (int r = 0; r < NUM_ROWS; r++) begin
-            for (int c = 0; c < NUM_COLS; c++) begin
+            for (int c = HALF_COLS; c < NUM_COLS; c++) begin
                 $fwrite(fp, "%0d ", get_pe_acc(r, c));
             end
             $fwrite(fp, "\n");
