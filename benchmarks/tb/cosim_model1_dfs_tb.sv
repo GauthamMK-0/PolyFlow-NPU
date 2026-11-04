@@ -34,9 +34,9 @@ module cosim_model1_dfs_tb;
     logic                               tile_acc_clr;
     logic                               tile_compute_en;
 
-    logic [NUM_COLS*DATA_W-1:0]         din_n;
+    logic [NUM_COLS*ACC_W-1:0]         din_n;
     logic [NUM_ROWS*DATA_W-1:0]         din_w;
-    wire  [NUM_COLS*DATA_W-1:0]         dout_s;
+    wire  [NUM_COLS*ACC_W-1:0]         dout_s;
     wire  [NUM_ROWS*DATA_W-1:0]         dout_e;
     wire  [NUM_ROWS*NUM_COLS*ACC_W-1:0] acc_out_flat;
 
@@ -54,13 +54,18 @@ module cosim_model1_dfs_tb;
     int end_cycle_vit = 0;
     int total_active_macs = 0;
 
+    // Output capture buffer for WS systolic GEMM
+    logic signed [ACC_W-1:0] hw_cnn_out [0:NUM_ROWS-1][0:HALF_COLS-1];
+    int m_idx;
+    int k_idx;
+
     // Helper to get PE accumulator
     function automatic logic signed [ACC_W-1:0] get_pe_acc(int r, int c);
         return acc_out_flat[(r*NUM_COLS + c)*ACC_W +: ACC_W];
     endfunction
 
-    task automatic set_din_n(int c, logic [DATA_W-1:0] val);
-        din_n[c*DATA_W +: DATA_W] = val;
+    task automatic set_din_n(int c, logic [ACC_W-1:0] val);
+        din_n[c*ACC_W +: ACC_W] = val;
     endtask
 
     task automatic set_din_w(int r, logic [DATA_W-1:0] val);
@@ -147,17 +152,39 @@ module cosim_model1_dfs_tb;
         end
         tile_w_ld = 0;
 
-        // Stream CNN activations across all rows (K_STEPS cycles)
-        tile_compute_en = 1;
-        for (int k = 0; k < K_STEPS; k++) begin
-            for (int r = 0; r < NUM_ROWS; r++) begin
-                set_din_w(r, cnn_inputs_mem[k][r]);
+        for (int r = 0; r < NUM_ROWS; r++) begin
+            for (int c = 0; c < HALF_COLS; c++) begin
+                hw_cnn_out[r][c] = '0;
             end
-            step_clk();
-            total_active_macs += (NUM_ROWS * HALF_COLS);
         end
 
-        // Cycle K+3: Drain final product register into accumulator
+        // Stream CNN activations across all rows with systolic skew (NUM_ROWS vectors)
+        tile_compute_en = 1;
+        for (int t = 0; t < NUM_ROWS + NUM_ROWS + HALF_COLS + 2; t++) begin
+            for (int r = 0; r < NUM_ROWS; r++) begin
+                m_idx = t - r;
+                if (m_idx >= 0 && m_idx < NUM_ROWS) begin
+                    set_din_w(r, cnn_inputs_mem[m_idx][r]);
+                end else begin
+                    set_din_w(r, 8'd0);
+                end
+            end
+            for (int c = 0; c < NUM_COLS; c++) begin
+                set_din_n(c, 32'd0);
+            end
+
+            // Capture completed dot product Y[m, c] from South port dout_s[c]
+            for (int c = 0; c < HALF_COLS; c++) begin
+                m_idx = t - (NUM_ROWS + 1 + c);
+                if (m_idx >= 0 && m_idx < NUM_ROWS) begin
+                    hw_cnn_out[m_idx][c] = $signed(dout_s[c*ACC_W +: ACC_W]);
+                end
+            end
+
+            step_clk();
+            if (t < NUM_ROWS) total_active_macs += (NUM_ROWS * HALF_COLS);
+        end
+
         din_w           = '0;
         tile_compute_en = 0;
         step_clk();
@@ -169,7 +196,7 @@ module cosim_model1_dfs_tb;
         fp = $fopen({"benchmarks/results/", `SCALE_NAME, "/m1_cnn_hw_output.txt"}, "w");
         for (int r = 0; r < NUM_ROWS; r++) begin
             for (int c = 0; c < HALF_COLS; c++) begin
-                $fwrite(fp, "%0d ", get_pe_acc(r, c));
+                $fwrite(fp, "%0d ", hw_cnn_out[r][c]);
             end
             $fwrite(fp, "\n");
         end
@@ -186,24 +213,30 @@ module cosim_model1_dfs_tb;
         step_clk();
         tile_acc_clr      = 0;
 
-        // Cycles 2 .. K+1: Stream ViT Q and K vectors (K_STEPS cycles)
-        // Tenant B computes NUM_ROWS x HALF_COLS outputs in cols [HALF_COLS..NUM_COLS-1].
+        // Cycles 2 .. K+skew: Stream ViT Q and K vectors with systolic skew
         tile_compute_en = 1;
-        for (int k = 0; k < K_STEPS; k++) begin
-            for (int c = 0; c < HALF_COLS; c++) begin
-                set_din_n(c, 8'd0);
-            end
-            for (int c = HALF_COLS; c < NUM_COLS; c++) begin
-                set_din_n(c, vit_q_mem[k][c]);
+        for (int t = 0; t < K_STEPS + NUM_ROWS + NUM_COLS + 2; t++) begin
+            for (int c = 0; c < NUM_COLS; c++) begin
+                k_idx = t - c;
+                if (k_idx >= 0 && k_idx < K_STEPS) begin
+                    set_din_n(c, {{ (ACC_W-DATA_W){vit_q_mem[k_idx][c][DATA_W-1]} }, vit_q_mem[k_idx][c]});
+                end else begin
+                    set_din_n(c, 32'd0);
+                end
             end
             for (int r = 0; r < NUM_ROWS; r++) begin
-                set_din_w(r, vit_k_mem[k][r]);
+                k_idx = t - r;
+                if (k_idx >= 0 && k_idx < K_STEPS) begin
+                    set_din_w(r, vit_k_mem[k_idx][r]);
+                end else begin
+                    set_din_w(r, 8'd0);
+                end
             end
             step_clk();
-            total_active_macs += (NUM_ROWS * HALF_COLS);
+            if (t < K_STEPS) total_active_macs += (NUM_ROWS * HALF_COLS);
         end
 
-        // Cycle K+2: Drain final product register into accumulator
+        // Drain final product register into accumulator
         din_n           = '0;
         din_w           = '0;
         tile_compute_en = 0;

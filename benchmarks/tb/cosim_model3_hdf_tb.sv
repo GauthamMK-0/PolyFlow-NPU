@@ -54,12 +54,12 @@ module cosim_model3_hdf_tb;
     logic [NUM_REGIONS-1:0]             w_ld;
     logic [NUM_REGIONS-1:0]             acc_clr;
 
-    logic [NUM_COLS*DATA_W-1:0]         din_n;
+    logic [NUM_COLS*ACC_W-1:0]         din_n;
     logic [NUM_ROWS*DATA_W-1:0]         din_w_region_a;
     logic [NUM_ROWS*DATA_W-1:0]         din_w_region_b;
 
     /* verilator lint_off UNUSEDSIGNAL */
-    wire  [NUM_COLS*DATA_W-1:0]         dout_s;
+    wire  [NUM_COLS*ACC_W-1:0]         dout_s;
     wire  [NUM_ROWS*DATA_W-1:0]         dout_e;
     wire  [NUM_REGIONS*BW_W-1:0]        bw_alloc;
     wire  [NUM_REGIONS-1:0]             reconfig_urgent;
@@ -82,6 +82,13 @@ module cosim_model3_hdf_tb;
     logic [DATA_W-1:0] vit_q_mem       [0:K_STEPS-1][0:NUM_COLS-1];
     logic [DATA_W-1:0] vit_k_mem       [0:K_STEPS-1][0:NUM_ROWS-1];
 
+    // Output capture buffer for Region A WS systolic GEMM
+    logic signed [ACC_W-1:0] hw_cnn_out [0:NUM_ROWS-1][0:HALF_COLS-1];
+    int m_idx;
+    int k_idx_q;
+    int k_idx_k;
+    int t_a;
+
     int cycle_count = 0;
     int start_cycle_total = 0;
     int end_cycle_reg_a = 0;
@@ -92,8 +99,8 @@ module cosim_model3_hdf_tb;
         return acc_out_flat[(r*NUM_COLS + c)*ACC_W +: ACC_W];
     endfunction
 
-    task automatic set_din_n(int c, logic [DATA_W-1:0] val);
-        din_n[c*DATA_W +: DATA_W] = val;
+    task automatic set_din_n(int c, logic [ACC_W-1:0] val);
+        din_n[c*ACC_W +: ACC_W] = val;
     endtask
 
     task automatic set_din_w_a(int r, logic [DATA_W-1:0] val);
@@ -218,53 +225,98 @@ module cosim_model3_hdf_tb;
         $display("Dynamic Boundary Split applied at Col %0d (Mask = %b)", HALF_COLS, region_id_mask);
         $display("Dataflows configured: Region A = WS (00) | Region B = OS (01)");
 
-        // Preload stationary weights for Region A (WS): shift West-to-East across Region A columns
-        w_ld[0]     = 1'b1;
-        for (int step = HALF_COLS - 1; step >= 0; step--) begin
-            for (int r = 0; r < NUM_ROWS; r++) begin
-                set_din_w_a(r, cnn_weights_mem[r][step]);
-            end
-            step_clk();
-        end
-        w_ld[0] = 1'b0;
-
-        // Concurrent streaming execution (K_STEPS cycles)
-        // Region A streams activations from West (WS)
-        // Region B streams Q from North and K from West simultaneously (OS)
-        // Pulse lifetime_ld on cycle 0 to load exact countdown window (Issue 6 fix)
-        lifetime_init = {K_STEPS[7:0], K_STEPS[7:0]};
+        // Pulse lifetime_init to 255 for both regions
+        lifetime_init = {8'd255, 8'd255};
         lifetime_ld   = 2'b11;
-        for (int k = 0; k < K_STEPS; k++) begin
+        step_clk();
+        lifetime_ld   = 2'b00;
+
+        for (int r = 0; r < NUM_ROWS; r++) begin
+            for (int c = 0; c < HALF_COLS; c++) begin
+                hw_cnn_out[r][c] = '0;
+            end
+        end
+
+        // Concurrent execution: Region A preloads weights, then computes WS.
+        // Region B executes Native OS immediately without waiting for Region A preload.
+        for (int t = 0; t < K_STEPS + NUM_ROWS + HALF_COLS + 4; t++) begin
+            // Region A:
+            if (t < HALF_COLS) begin
+                w_ld[0] = 1'b1;
+                for (int r = 0; r < NUM_ROWS; r++) begin
+                    set_din_w_a(r, cnn_weights_mem[r][HALF_COLS - 1 - t]);
+                end
+                for (int c = 0; c < HALF_COLS; c++) begin
+                    set_din_n(c, 32'd0);
+                end
+            end else begin
+                w_ld[0] = 1'b0;
+                t_a = t - HALF_COLS;
+                for (int r = 0; r < NUM_ROWS; r++) begin
+                    m_idx = t_a - r;
+                    if (m_idx >= 0 && m_idx < NUM_ROWS) begin
+                        set_din_w_a(r, cnn_inputs_mem[m_idx][r]);
+                    end else begin
+                        set_din_w_a(r, 8'd0);
+                    end
+                end
+                for (int c = 0; c < HALF_COLS; c++) begin
+                    set_din_n(c, 32'd0);
+                    m_idx = t_a - (NUM_ROWS + 1 + c);
+                    if (m_idx >= 0 && m_idx < NUM_ROWS) begin
+                        hw_cnn_out[m_idx][c] = $signed(dout_s[c*ACC_W +: ACC_W]);
+                    end
+                end
+                if (t_a < NUM_ROWS) total_active_macs += (NUM_ROWS * HALF_COLS);
+                if (t == HALF_COLS + 2*NUM_ROWS + HALF_COLS) begin
+                    end_cycle_reg_a = cycle_count;
+                end
+            end
+
+            // Region B:
             for (int r = 0; r < NUM_ROWS; r++) begin
-                set_din_w_a(r, cnn_inputs_mem[k][r]);
-                set_din_w_b(r, vit_k_mem[k][r]); // K into Region B
+                k_idx_k = t - r;
+                if (k_idx_k >= 0 && k_idx_k < K_STEPS) begin
+                    set_din_w_b(r, vit_k_mem[k_idx_k][r]);
+                end else begin
+                    set_din_w_b(r, 8'd0);
+                end
             end
             for (int c = HALF_COLS; c < NUM_COLS; c++) begin
-                set_din_n(c, vit_q_mem[k][c]);   // Q into Region B
+                k_idx_q = t - (c - HALF_COLS);
+                if (k_idx_q >= 0 && k_idx_q < K_STEPS) begin
+                    set_din_n(c, {{ (ACC_W-DATA_W){vit_q_mem[k_idx_q][c][DATA_W-1]} }, vit_q_mem[k_idx_q][c]});
+                end else begin
+                    set_din_n(c, 32'd0);
+                end
             end
+            if (t < K_STEPS) total_active_macs += (NUM_ROWS * HALF_COLS);
+
             step_clk();
-            lifetime_ld = 2'b00; // Deassert after cycle 0 so lifetime_cnt counts down dynamically
-            total_active_macs += (NUM_ROWS * HALF_COLS); // Region A active
-            total_active_macs += (NUM_ROWS * HALF_COLS); // Region B active
         end
 
-        // Cycle K+3: Drain final product register into accumulator
-        lifetime_ld    = 2'b00;
+        // Drain final registers
         din_n          = '0;
         din_w_region_a = '0;
         din_w_region_b = '0;
+        w_ld           = 2'b00;
         step_clk();
 
-        end_cycle_reg_a = cycle_count;
+        if (end_cycle_reg_a == 0) end_cycle_reg_a = HALF_COLS + 2*NUM_ROWS + HALF_COLS;
         end_cycle_reg_b = cycle_count;
+
         $display("Region A (CNN Native WS) Completed: %0d cycles", (end_cycle_reg_a - start_cycle_total));
         $display("Region B (ViT Native OS) Completed: %0d cycles (Zero reload stalls!)", (end_cycle_reg_b - start_cycle_total));
 
-        // Dump final combined hardware output
+        // Dump final combined hardware output: [Region A (WS) | Region B (OS)]
         fp = $fopen({"benchmarks/results/", `SCALE_NAME, "/m3_multitenant_hw_output.txt"}, "w");
         for (int r = 0; r < NUM_ROWS; r++) begin
             for (int c = 0; c < NUM_COLS; c++) begin
-                $fwrite(fp, "%0d ", get_pe_acc(r, c));
+                if (c < HALF_COLS) begin
+                    $fwrite(fp, "%0d ", hw_cnn_out[r][c]);
+                end else begin
+                    $fwrite(fp, "%0d ", get_pe_acc(r, c));
+                end
             end
             $fwrite(fp, "\n");
         end

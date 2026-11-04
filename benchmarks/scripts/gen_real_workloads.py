@@ -160,22 +160,18 @@ def generate_workloads_for_scale(scale_name, cfg, r50_raw, vit_q_raw, vit_k_raw)
     # Golden Output Computation (Pure INT32 Mathematical Ground Truth)
     # --------------------------------------------------------------------------
     # 1. Full-array CNN Solo (Model 1 WS):
-    # Acc[r][c] = sum_k (cnn_inputs[k][r] * cnn_weights[r][c])
-    golden_m1_cnn = np.zeros((rows, cols), dtype=np.int32)
-    for r in range(rows):
-        for c in range(cols):
-            golden_m1_cnn[r, c] = int(np.sum(cnn_inputs[:, r].astype(np.int32) * int(cnn_weights[r, c])))
+    # True Systolic GEMM / Conv dot product: Y = X @ W
+    # cnn_inputs[:rows, :] has shape (rows, rows); cnn_weights has shape (rows, cols)
+    golden_m1_cnn = (cnn_inputs[:rows, :].astype(np.int32) @ cnn_weights.astype(np.int32))
 
     # 2. Full-array ViT Attention Solo (Model 1 OS):
-    # Acc[r][c] = sum_k (vit_k[k][r] * vit_q[k][c]) = (K^T * Q)[r, c]
-    golden_m1_vit = np.zeros((rows, cols), dtype=np.int32)
-    for r in range(rows):
-        for c in range(cols):
-            golden_m1_vit[r, c] = int(np.sum(vit_k[:, r].astype(np.int32) * vit_q[:, c].astype(np.int32)))
+    # True Attention Matrix Multiplication: S = K^T @ Q
+    # vit_k has shape (k_steps, rows); vit_q has shape (k_steps, cols)
+    golden_m1_vit = (vit_k.astype(np.int32).T @ vit_q.astype(np.int32))
 
     # 3. Multi-Tenant Concurrent Execution (Model 2 & Model 3):
-    # Region A (Cols 0 .. half_cols-1): Real CNN Workload
-    # Region B (Cols half_cols .. cols-1): Real ViT Attention Workload
+    # Region A (Cols 0 .. half_cols-1): Real CNN Workload (WS Mode)
+    # Region B (Cols half_cols .. cols-1): Real ViT Attention Workload (OS Mode)
     golden_reg_a = golden_m1_cnn[:, :half_cols]
     golden_reg_b = golden_m1_vit[:, half_cols:]
 
