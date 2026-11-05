@@ -84,6 +84,9 @@ module dfs_top_16x16_tb;
     endtask
 
     logic signed [ACC_W-1:0] exp_val;
+    int k_idx_c;
+    int k_idx_r;
+    int k_w;
 
     initial begin
         $display("================================================================");
@@ -108,12 +111,14 @@ module dfs_top_16x16_tb;
             step_clk();
         end
         tile_w_ld = 0;
+        din_w     = '0;
 
         // Stream activations through West: (r + 1) * ((5 + c) * 3)
         tile_compute_en = 1;
         for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd3);
         repeat (NUM_ROWS + NUM_COLS + 2) step_clk();
         tile_compute_en = 0;
+        din_w           = '0;
         step_clk(); // Drain pipeline stage
 
         $display("16x16 WS Mode: PE[0][0] = %0d, PE[15][15] = %0d (Expected: %0d, %0d)",
@@ -133,58 +138,99 @@ module dfs_top_16x16_tb;
 
         // TEST 2: Output-Stationary (OS) Mode
         $display("\n--- [TEST 2] 16x16 OS Mode Execution ---");
+        din_n           = '0;
+        din_w           = '0;
+        tile_compute_en = 0;
+        repeat (NUM_ROWS + NUM_COLS + 2) step_clk();
+
         tile_acc_clr      = 1;
         cfg_dataflow_mode = 2'b01;
         step_clk();
         tile_acc_clr      = 0;
 
+        // Stream 3 vectors with 2D systolic skew: (4*7 + 2*6 + 3*5 = 55)
         tile_compute_en = 1;
-        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 32'd4);
-        for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd7);
-        step_clk(); // 28
-
-        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 32'd2);
-        for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd6);
-        step_clk(); // 12 -> 40
-
-        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 32'd3);
-        for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd5);
-        step_clk(); // 15 -> 55
+        for (int t = 0; t < 3 + NUM_ROWS + NUM_COLS + 2; t++) begin
+            for (int c = 0; c < NUM_COLS; c++) begin
+                k_idx_c = t - c;
+                if (k_idx_c == 0)      set_din_n(c, 32'd4);
+                else if (k_idx_c == 1) set_din_n(c, 32'd2);
+                else if (k_idx_c == 2) set_din_n(c, 32'd3);
+                else                   set_din_n(c, 32'd0);
+            end
+            for (int r = 0; r < NUM_ROWS; r++) begin
+                k_idx_r = t - r;
+                if (k_idx_r == 0)      set_din_w(r, 8'd7);
+                else if (k_idx_r == 1) set_din_w(r, 8'd6);
+                else if (k_idx_r == 2) set_din_w(r, 8'd5);
+                else                   set_din_w(r, 8'd0);
+            end
+            step_clk();
+        end
         tile_compute_en = 0;
-        step_clk();
+        din_n           = '0;
+        din_w           = '0;
+        repeat (NUM_ROWS + NUM_COLS + 2) step_clk();
 
-        $display("16x16 OS Mode: PE[0][0] = %0d (Expected: 55)", get_pe_acc(0,0));
-        if (get_pe_acc(0,0) !== 32'd55) begin
-            $display("ERROR: 16x16 OS Mode mismatch!");
-            error_count++;
-        end else begin
-            $display("PASS: 16x16 OS Mode verified successfully.");
+        $display("16x16 OS Mode: Verifying all PEs across 16x16 grid (Expected: 55)");
+        for (int r = 0; r < NUM_ROWS; r++) begin
+            for (int c = 0; c < NUM_COLS; c++) begin
+                if (get_pe_acc(r, c) !== 32'd55) begin
+                    $display("ERROR: 16x16 OS Mode mismatch at PE[%0d][%0d]: %0d (Expected: 55)!", r, c, get_pe_acc(r, c));
+                    error_count++;
+                end
+            end
+        end
+        if (error_count == 0) begin
+            $display("PASS: 16x16 OS Mode verified successfully across all 256 PEs.");
         end
 
         // TEST 3: Input-Stationary (IS) Mode
         $display("\n--- [TEST 3] 16x16 IS Mode Execution ---");
+        din_n           = '0;
+        din_w           = '0;
+        tile_compute_en = 0;
+        repeat (NUM_ROWS + NUM_COLS + 2) step_clk();
+
         tile_acc_clr      = 1;
         cfg_dataflow_mode = 2'b10;
         step_clk();
         tile_acc_clr      = 0;
 
+        // Preload activation = 6 shifting North-to-South across all 16 rows
         tile_w_ld = 1;
-        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 32'd6);
-        step_clk();
+        for (int step = NUM_ROWS - 1; step >= 0; step--) begin
+            for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 32'd6);
+            step_clk();
+        end
         tile_w_ld = 0;
+        din_n     = '0;
 
+        // Stream weights = 4 for 3 cycles from West with systolic propagation: 3 * (6 * 4) = 72
         tile_compute_en = 1;
-        for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd4);
-        repeat (3) step_clk(); // 3 * (6 * 4) = 72
+        for (int t = 0; t < 3 + NUM_COLS + NUM_ROWS + 2; t++) begin
+            for (int r = 0; r < NUM_ROWS; r++) begin
+                k_w = t - r;
+                if (k_w >= 0 && k_w < 3) set_din_w(r, 8'd4);
+                else                     set_din_w(r, 8'd0);
+            end
+            step_clk();
+        end
         tile_compute_en = 0;
-        step_clk();
+        din_w           = '0;
+        repeat (NUM_ROWS + NUM_COLS + 2) step_clk();
 
-        $display("16x16 IS Mode: PE[0][0] = %0d (Expected: 72)", get_pe_acc(0,0));
-        if (get_pe_acc(0,0) !== 32'd72) begin
-            $display("ERROR: 16x16 IS Mode mismatch!");
-            error_count++;
-        end else begin
-            $display("PASS: 16x16 IS Mode verified successfully across all 16 columns.");
+        $display("16x16 IS Mode: Verifying all PEs across 16x16 grid (Expected: 72)");
+        for (int r = 0; r < NUM_ROWS; r++) begin
+            for (int c = 0; c < NUM_COLS; c++) begin
+                if (get_pe_acc(r, c) !== 32'd72) begin
+                    $display("ERROR: 16x16 IS Mode mismatch at PE[%0d][%0d]: %0d (Expected: 72)!", r, c, get_pe_acc(r, c));
+                    error_count++;
+                end
+            end
+        end
+        if (error_count == 0) begin
+            $display("PASS: 16x16 IS Mode verified successfully across all 256 PEs.");
         end
 
         // Summary

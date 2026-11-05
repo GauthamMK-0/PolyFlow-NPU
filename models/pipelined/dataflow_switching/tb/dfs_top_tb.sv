@@ -88,6 +88,9 @@ module dfs_top_tb;
     endtask
 
     logic signed [ACC_W-1:0] exp_val;
+    int k_idx_c;
+    int k_idx_r;
+    int k_w;
 
     initial begin
         $display("================================================================");
@@ -122,7 +125,8 @@ module dfs_top_tb;
         end
         repeat (NUM_ROWS + NUM_COLS + 2) step_clk();
         tile_compute_en = 0;
-        step_clk(); // drain pipeline stage
+        din_w           = '0;
+        step_clk(); // capture output
 
         $display("WS Mode: PE[0][0] = %0d (Exp: %0d), PE[%0d][%0d] = %0d (Exp: %0d)",
                  get_pe_acc(0,0), 1*3*(5+0), NUM_ROWS-1, NUM_COLS-1,
@@ -144,69 +148,104 @@ module dfs_top_tb;
         // TEST 2: Output-Stationary (OS) Mode (Attention Layer Q*K^T)
         // -------------------------------------------------------------
         $display("\n--- [TEST 2] Output-Stationary (OS) Mode Execution ---");
-        // Clear accumulators for new tile
+        // Flush mesh forwarding registers with zeros before reconfiguration
+        din_n           = '0;
+        din_w           = '0;
+        tile_compute_en = 0;
+        repeat (NUM_ROWS + NUM_COLS + 2) step_clk();
+
         tile_acc_clr      = 1;
         cfg_dataflow_mode = 2'b01; // OS mode
         step_clk();
         tile_acc_clr      = 0;
 
-        // In OS mode, operands stream simultaneously from North (Q) and West (K)
+        // In OS mode, operands stream with 2D systolic diamond skew
+        // Stream 3 vectors: step 0 (Q=4, K=7 -> 28), step 1 (Q=2, K=6 -> 12), step 2 (Q=3, K=5 -> 15)
+        // Expected accumulation at every PE[r][c] = 28 + 12 + 15 = 55
         tile_compute_en = 1;
-        // Cycle 1: Q=4, K=7 -> prod = 28
-        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 32'd4);
-        for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd7);
-        step_clk();
-
-        // Cycle 2: Q=2, K=6 -> prod = 12 -> acc = 28 + 12 = 40
-        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 32'd2);
-        for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd6);
-        step_clk();
-
-        // Cycle 3: Q=3, K=5 -> prod = 15 -> acc = 40 + 15 = 55
-        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 32'd3);
-        for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd5);
-        step_clk();
+        for (int t = 0; t < 3 + NUM_ROWS + NUM_COLS + 2; t++) begin
+            for (int c = 0; c < NUM_COLS; c++) begin
+                k_idx_c = t - c;
+                if (k_idx_c == 0)      set_din_n(c, 32'd4);
+                else if (k_idx_c == 1) set_din_n(c, 32'd2);
+                else if (k_idx_c == 2) set_din_n(c, 32'd3);
+                else                   set_din_n(c, 32'd0);
+            end
+            for (int r = 0; r < NUM_ROWS; r++) begin
+                k_idx_r = t - r;
+                if (k_idx_r == 0)      set_din_w(r, 8'd7);
+                else if (k_idx_r == 1) set_din_w(r, 8'd6);
+                else if (k_idx_r == 2) set_din_w(r, 8'd5);
+                else                   set_din_w(r, 8'd0);
+            end
+            step_clk();
+        end
         tile_compute_en = 0;
-        step_clk(); // drain pipeline stage
+        din_n           = '0;
+        din_w           = '0;
+        repeat (NUM_ROWS + NUM_COLS + 2) step_clk(); // drain pipeline stage
 
-        $display("OS Mode: PE[0][0] Accumulator = %0d (Expected: 55)", get_pe_acc(0,0));
-        if (get_pe_acc(0,0) !== 32'd55) begin
-            $display("ERROR: OS Mode calculation mismatch!");
-            error_count++;
-        end else begin
-            $display("PASS: OS Mode verified successfully.");
+        $display("OS Mode: Verifying all PEs across %0dx%0d grid (Expected: 55)", NUM_ROWS, NUM_COLS);
+        for (int r = 0; r < NUM_ROWS; r++) begin
+            for (int c = 0; c < NUM_COLS; c++) begin
+                if (get_pe_acc(r, c) !== 32'd55) begin
+                    $display("ERROR: OS Mode mismatch at PE[%0d][%0d]: %0d (Expected: 55)", r, c, get_pe_acc(r, c));
+                    error_count++;
+                end
+            end
+        end
+        if (error_count == 0) begin
+            $display("PASS: OS Mode verified successfully across all %0d PEs.", NUM_ROWS * NUM_COLS);
         end
 
         // -------------------------------------------------------------
         // TEST 3: Input-Stationary (IS) Mode (Depthwise Conv)
         // -------------------------------------------------------------
         $display("\n--- [TEST 3] Input-Stationary (IS) Mode Execution ---");
+        din_n           = '0;
+        din_w           = '0;
+        tile_compute_en = 0;
+        repeat (NUM_ROWS + NUM_COLS + 2) step_clk();
+
         tile_acc_clr      = 1;
         cfg_dataflow_mode = 2'b10; // IS mode
         step_clk();
         tile_acc_clr      = 0;
 
-        // Preload activation from North
+        // Preload activation from North: shift North-to-South across all NUM_ROWS rows
         tile_w_ld = 1;
-        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 32'd6); // Stationary activation = 6
-        step_clk();
+        for (int step = NUM_ROWS - 1; step >= 0; step--) begin
+            for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 32'd6); // Stationary activation = 6
+            step_clk();
+        end
         tile_w_ld = 0;
+        din_n     = '0;
 
-        // Stream weights from West over 3 cycles: weight = 4
+        // Stream weights from West with systolic propagation: each PE multiplies stat_op (6) * weight (4) for 3 cycles
         tile_compute_en = 1;
-        for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd4);
-        step_clk(); // 6 * 4 = 24
-        step_clk(); // 24 + 24 = 48
-        step_clk(); // 48 + 24 = 72
+        for (int t = 0; t < 3 + NUM_COLS + NUM_ROWS + 2; t++) begin
+            for (int r = 0; r < NUM_ROWS; r++) begin
+                k_w = t - r;
+                if (k_w >= 0 && k_w < 3) set_din_w(r, 8'd4);
+                else                     set_din_w(r, 8'd0);
+            end
+            step_clk();
+        end
         tile_compute_en = 0;
-        step_clk(); // drain pipeline stage
+        din_w           = '0;
+        repeat (NUM_ROWS + NUM_COLS + 2) step_clk(); // drain pipeline stage
 
-        $display("IS Mode: PE[0][0] Accumulator = %0d (Expected: 72)", get_pe_acc(0,0));
-        if (get_pe_acc(0,0) !== 32'd72) begin
-            $display("ERROR: IS Mode calculation mismatch!");
-            error_count++;
-        end else begin
-            $display("PASS: IS Mode verified successfully.");
+        $display("IS Mode: Verifying all PEs across %0dx%0d grid (Expected: 72)", NUM_ROWS, NUM_COLS);
+        for (int r = 0; r < NUM_ROWS; r++) begin
+            for (int c = 0; c < NUM_COLS; c++) begin
+                if (get_pe_acc(r, c) !== 32'd72) begin
+                    $display("ERROR: IS Mode mismatch at PE[%0d][%0d]: %0d (Expected: 72)", r, c, get_pe_acc(r, c));
+                    error_count++;
+                end
+            end
+        end
+        if (error_count == 0) begin
+            $display("PASS: IS Mode verified successfully across all %0d PEs.", NUM_ROWS * NUM_COLS);
         end
 
         // -------------------------------------------------------------
