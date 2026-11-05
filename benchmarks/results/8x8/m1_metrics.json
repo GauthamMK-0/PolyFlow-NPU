@@ -1,10 +1,10 @@
 {
   "model": "Model 1 (Sequential Switching)",
   "scale": "8x8",
-  "cnn_cycles": 28,
-  "vit_cycles": 52,
-  "reg_a_turnaround_cycles": 28,
-  "reg_b_turnaround_cycles": 80,
-  "total_makespan_cycles": 80,
-  "total_valid_macs": 1280
+  "cnn_cycles": 52,
+  "vit_cycles": 48,
+  "reg_a_turnaround_cycles": 52,
+  "reg_b_turnaround_cycles": 100,
+  "total_makespan_cycles": 100,
+  "total_valid_macs": 2048
 }
