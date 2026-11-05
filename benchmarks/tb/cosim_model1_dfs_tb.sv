@@ -55,7 +55,7 @@ module cosim_model1_dfs_tb;
     int total_active_macs = 0;
 
     // Output capture buffer for WS systolic GEMM
-    logic signed [ACC_W-1:0] hw_cnn_out [0:NUM_ROWS-1][0:HALF_COLS-1];
+    logic signed [ACC_W-1:0] hw_cnn_out [0:K_STEPS-1][0:HALF_COLS-1];
     int m_idx;
     int k_idx;
 
@@ -152,18 +152,18 @@ module cosim_model1_dfs_tb;
         end
         tile_w_ld = 0;
 
-        for (int r = 0; r < NUM_ROWS; r++) begin
+        for (int m = 0; m < K_STEPS; m++) begin
             for (int c = 0; c < HALF_COLS; c++) begin
-                hw_cnn_out[r][c] = '0;
+                hw_cnn_out[m][c] = '0;
             end
         end
 
-        // Stream CNN activations across all rows with systolic skew (NUM_ROWS vectors)
+        // Stream CNN activations across all rows with systolic skew (K_STEPS vectors)
         tile_compute_en = 1;
-        for (int t = 0; t < NUM_ROWS + NUM_ROWS + HALF_COLS + 2; t++) begin
+        for (int t = 0; t < K_STEPS + NUM_ROWS + HALF_COLS + 2; t++) begin
             for (int r = 0; r < NUM_ROWS; r++) begin
                 m_idx = t - r;
-                if (m_idx >= 0 && m_idx < NUM_ROWS) begin
+                if (m_idx >= 0 && m_idx < K_STEPS) begin
                     set_din_w(r, cnn_inputs_mem[m_idx][r]);
                 end else begin
                     set_din_w(r, 8'd0);
@@ -176,13 +176,13 @@ module cosim_model1_dfs_tb;
             // Capture completed dot product Y[m, c] from South port dout_s[c]
             for (int c = 0; c < HALF_COLS; c++) begin
                 m_idx = t - (NUM_ROWS + 1 + c);
-                if (m_idx >= 0 && m_idx < NUM_ROWS) begin
+                if (m_idx >= 0 && m_idx < K_STEPS) begin
                     hw_cnn_out[m_idx][c] = $signed(dout_s[c*ACC_W +: ACC_W]);
                 end
             end
 
             step_clk();
-            if (t < NUM_ROWS) total_active_macs += (NUM_ROWS * HALF_COLS);
+            if (t < K_STEPS) total_active_macs += (NUM_ROWS * HALF_COLS);
         end
 
         din_w           = '0;
@@ -192,11 +192,11 @@ module cosim_model1_dfs_tb;
         end_cycle_cnn = cycle_count;
         $display("Tenant A (CNN Solo WS) Completed: %0d cycles", (end_cycle_cnn - start_cycle_cnn));
 
-        // Dump CNN solo output to result file (NUM_ROWS x HALF_COLS)
+        // Dump CNN solo output to result file (K_STEPS x HALF_COLS)
         fp = $fopen({"benchmarks/results/", `SCALE_NAME, "/m1_cnn_hw_output.txt"}, "w");
-        for (int r = 0; r < NUM_ROWS; r++) begin
+        for (int m = 0; m < K_STEPS; m++) begin
             for (int c = 0; c < HALF_COLS; c++) begin
-                $fwrite(fp, "%0d ", hw_cnn_out[r][c]);
+                $fwrite(fp, "%0d ", hw_cnn_out[m][c]);
             end
             $fwrite(fp, "\n");
         end
@@ -213,16 +213,19 @@ module cosim_model1_dfs_tb;
         step_clk();
         tile_acc_clr      = 0;
 
-        // Cycles 2 .. K+skew: Stream ViT Q and K vectors with systolic skew
+        // Stream ViT Q and K vectors with systolic skew
         tile_compute_en = 1;
-        for (int t = 0; t < K_STEPS + NUM_ROWS + NUM_COLS + 2; t++) begin
-            for (int c = 0; c < NUM_COLS; c++) begin
+        for (int t = 0; t < K_STEPS + NUM_ROWS + HALF_COLS + 2; t++) begin
+            for (int c = 0; c < HALF_COLS; c++) begin
                 k_idx = t - c;
                 if (k_idx >= 0 && k_idx < K_STEPS) begin
-                    set_din_n(c, {{ (ACC_W-DATA_W){vit_q_mem[k_idx][c][DATA_W-1]} }, vit_q_mem[k_idx][c]});
+                    set_din_n(c, {{ (ACC_W-DATA_W){vit_q_mem[k_idx][HALF_COLS + c][DATA_W-1]} }, vit_q_mem[k_idx][HALF_COLS + c]});
                 end else begin
                     set_din_n(c, 32'd0);
                 end
+            end
+            for (int c = HALF_COLS; c < NUM_COLS; c++) begin
+                set_din_n(c, 32'd0);
             end
             for (int r = 0; r < NUM_ROWS; r++) begin
                 k_idx = t - r;
@@ -248,7 +251,7 @@ module cosim_model1_dfs_tb;
         // Dump ViT solo output (NUM_ROWS x HALF_COLS)
         fp = $fopen({"benchmarks/results/", `SCALE_NAME, "/m1_vit_hw_output.txt"}, "w");
         for (int r = 0; r < NUM_ROWS; r++) begin
-            for (int c = HALF_COLS; c < NUM_COLS; c++) begin
+            for (int c = 0; c < HALF_COLS; c++) begin
                 $fwrite(fp, "%0d ", get_pe_acc(r, c));
             end
             $fwrite(fp, "\n");

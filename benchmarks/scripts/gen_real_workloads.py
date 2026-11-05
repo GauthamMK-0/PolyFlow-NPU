@@ -159,48 +159,48 @@ def generate_workloads_for_scale(scale_name, cfg, r50_raw, vit_q_raw, vit_k_raw)
     # --------------------------------------------------------------------------
     # Golden Output Computation (Pure INT32 Mathematical Ground Truth)
     # --------------------------------------------------------------------------
-    # 1. Full-array CNN Solo (Model 1 WS):
-    # True Systolic GEMM / Conv dot product: Y = X @ W
-    # cnn_inputs[:rows, :] has shape (rows, rows); cnn_weights has shape (rows, cols)
-    golden_m1_cnn = (cnn_inputs[:rows, :].astype(np.int32) @ cnn_weights.astype(np.int32))
+    # 1. CNN Workload (Weight-Stationary GEMM):
+    # Stream ALL k_steps activation vectors: Y = X @ W
+    # cnn_inputs has shape (k_steps, rows); cnn_weights has shape (rows, cols)
+    # golden_m1_cnn has shape (k_steps, cols)
+    golden_m1_cnn = (cnn_inputs.astype(np.int32) @ cnn_weights.astype(np.int32))
 
-    # 2. Full-array ViT Attention Solo (Model 1 OS):
+    # 2. ViT Attention Workload (Output-Stationary GEMM):
     # True Attention Matrix Multiplication: S = K^T @ Q
     # vit_k has shape (k_steps, rows); vit_q has shape (k_steps, cols)
+    # golden_m1_vit has shape (rows, cols)
     golden_m1_vit = (vit_k.astype(np.int32).T @ vit_q.astype(np.int32))
 
-    # 3. Multi-Tenant Concurrent Execution (Model 2 & Model 3):
-    # Region A (Cols 0 .. half_cols-1): Real CNN Workload (WS Mode)
-    # Region B (Cols half_cols .. cols-1): Real ViT Attention Workload (OS Mode)
+    # 3. Multi-Tenant Partitions:
+    # Region A (Cols 0 .. half_cols-1): Real CNN Workload (WS Mode), shape (k_steps, half_cols)
+    # Region B (Cols half_cols .. cols-1): Real ViT Attention Workload (OS Mode), shape (rows, half_cols)
     golden_reg_a = golden_m1_cnn[:, :half_cols]
     golden_reg_b = golden_m1_vit[:, half_cols:]
 
-    golden_combined = np.hstack([golden_reg_a, golden_reg_b])
-
-    # Save golden outputs as JSON (for human inspection) and NPY
+    # Save golden outputs as JSON (for inspection and verification) and NPY
     golden_data = {
         "scale": scale_name,
         "rows": rows,
         "cols": cols,
         "k_steps": k_steps,
-        "m1_cnn_solo": golden_m1_cnn.tolist(),
-        "m1_vit_solo": golden_m1_vit.tolist(),
+        "m1_cnn_solo": golden_reg_a.tolist(),
+        "m1_vit_solo": golden_reg_b.tolist(),
         "region_a_cnn": golden_reg_a.tolist(),
-        "region_b_vit": golden_reg_b.tolist(),
-        "combined_multitenant": golden_combined.tolist()
+        "region_b_vit": golden_reg_b.tolist()
     }
 
     with open(os.path.join(data_dir, "golden_outputs.json"), "w") as f:
         json.dump(golden_data, f, indent=2)
 
-    np.save(os.path.join(data_dir, "golden_outputs.npy"), golden_combined)
+    np.save(os.path.join(data_dir, "golden_reg_a.npy"), golden_reg_a)
+    np.save(os.path.join(data_dir, "golden_reg_b.npy"), golden_reg_b)
 
     print(f"Generated from REAL pretrained weights:")
     print(f"  - {data_dir}/cnn_weights.mem ({rows}x{cols})")
     print(f"  - {data_dir}/cnn_inputs.mem  ({k_steps}x{rows})")
     print(f"  - {data_dir}/vit_q.mem       ({k_steps}x{cols})")
     print(f"  - {data_dir}/vit_k.mem       ({k_steps}x{rows})")
-    print(f"  - {data_dir}/golden_outputs.json & .npy")
+    print(f"  - {data_dir}/golden_outputs.json (Reg A: {k_steps}x{half_cols}, Reg B: {rows}x{half_cols})")
 
 def main():
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

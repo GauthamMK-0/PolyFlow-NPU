@@ -84,12 +84,13 @@ def verify_scale(scale_name):
 
     golden_reg_a = np.array(golden_data["region_a_cnn"], dtype=np.int32)
     golden_reg_b = np.array(golden_data["region_b_vit"], dtype=np.int32)
-    golden_combined = np.array(golden_data["combined_multitenant"], dtype=np.int32)
 
-    hw_m1_cnn = load_matrix_txt(os.path.join(results_dir, "m1_cnn_hw_output.txt"))
-    hw_m1_vit = load_matrix_txt(os.path.join(results_dir, "m1_vit_hw_output.txt"))
-    hw_m2_combined = load_matrix_txt(os.path.join(results_dir, "m2_multitenant_hw_output.txt"))
-    hw_m3_combined = load_matrix_txt(os.path.join(results_dir, "m3_multitenant_hw_output.txt"))
+    hw_m1_cnn   = load_matrix_txt(os.path.join(results_dir, "m1_cnn_hw_output.txt"))
+    hw_m1_vit   = load_matrix_txt(os.path.join(results_dir, "m1_vit_hw_output.txt"))
+    hw_m2_reg_a = load_matrix_txt(os.path.join(results_dir, "m2_reg_a_hw_output.txt"))
+    hw_m2_reg_b = load_matrix_txt(os.path.join(results_dir, "m2_reg_b_hw_output.txt"))
+    hw_m3_reg_a = load_matrix_txt(os.path.join(results_dir, "m3_reg_a_hw_output.txt"))
+    hw_m3_reg_b = load_matrix_txt(os.path.join(results_dir, "m3_reg_b_hw_output.txt"))
 
     print(f"\n========================================================")
     print(f" Co-Verification & Accuracy Evaluation [Scale: {scale_name}]")
@@ -108,15 +109,25 @@ def verify_scale(scale_name):
     all_passed = all_passed and p2
     if s2: scale_stats.append(s2)
 
-    # 3. Model 2 Multi-Tenant Co-Execution (Full Array: Region A + Region B)
-    p3, s3 = evaluate_accuracy(hw_m2_combined, golden_combined, "Model 2: Planaria Multi-Tenant (Reg A: WS + Reg B: Forced WS)")
+    # 3. Model 2 Region A (CNN WS)
+    p3, s3 = evaluate_accuracy(hw_m2_reg_a, golden_reg_a, "Model 2: Region A ResNet-50 CNN (Native WS)")
     all_passed = all_passed and p3
     if s3: scale_stats.append(s3)
 
-    # 4. Model 3 Multi-Tenant Co-Execution (Full Array: Region A + Region B)
-    p4, s4 = evaluate_accuracy(hw_m3_combined, golden_combined, "Model 3: PolyFlow-NPU Multi-Tenant (Reg A: WS + Reg B: Native OS)")
+    # 4. Model 2 Region B (ViT Forced WS)
+    p4, s4 = evaluate_accuracy(hw_m2_reg_b, golden_reg_b, "Model 2: Region B ViT Attention (Forced WS Tiled)")
     all_passed = all_passed and p4
     if s4: scale_stats.append(s4)
+
+    # 5. Model 3 Region A (CNN WS)
+    p5, s5 = evaluate_accuracy(hw_m3_reg_a, golden_reg_a, "Model 3: Region A ResNet-50 CNN (Native WS)")
+    all_passed = all_passed and p5
+    if s5: scale_stats.append(s5)
+
+    # 6. Model 3 Region B (ViT Native OS)
+    p6, s6 = evaluate_accuracy(hw_m3_reg_b, golden_reg_b, "Model 3: Region B ViT Attention (Native OS Concurrent)")
+    all_passed = all_passed and p6
+    if s6: scale_stats.append(s6)
 
     # Dump verification summary JSON
     with open(os.path.join(results_dir, "accuracy_report.json"), "w") as f:

@@ -83,11 +83,15 @@ module cosim_model3_hdf_tb;
     logic [DATA_W-1:0] vit_k_mem       [0:K_STEPS-1][0:NUM_ROWS-1];
 
     // Output capture buffer for Region A WS systolic GEMM
-    logic signed [ACC_W-1:0] hw_cnn_out [0:NUM_ROWS-1][0:HALF_COLS-1];
+    logic signed [ACC_W-1:0] hw_cnn_out [0:K_STEPS-1][0:HALF_COLS-1];
     int m_idx;
     int k_idx_q;
     int k_idx_k;
     int t_a;
+
+    localparam int LIFETIME_A = HALF_COLS + K_STEPS + NUM_ROWS + HALF_COLS + 2;
+    localparam int LIFETIME_B = K_STEPS + NUM_ROWS + HALF_COLS + 2;
+    localparam int MAX_STEPS  = (LIFETIME_A > LIFETIME_B) ? LIFETIME_A : LIFETIME_B;
 
     int cycle_count = 0;
     int start_cycle_total = 0;
@@ -215,31 +219,29 @@ module cosim_model3_hdf_tb;
         // -------------------------------------------------------------
         start_cycle_total = cycle_count;
 
-        // Cycle 1: Strobe split boundary & clear accumulators
+        // Cycle 1: Strobe split boundary, clear accumulators & initialize lifetime counters
         cfg_update_strobe = 1;
         acc_clr           = 2'b11;
+        lifetime_init     = {LIFETIME_B[7:0], LIFETIME_A[7:0]};
+        lifetime_ld       = 2'b11;
         step_clk();
         cfg_update_strobe = 0;
         acc_clr           = 2'b00;
+        lifetime_ld       = 2'b00;
 
         $display("Dynamic Boundary Split applied at Col %0d (Mask = %b)", HALF_COLS, region_id_mask);
         $display("Dataflows configured: Region A = WS (00) | Region B = OS (01)");
+        $display("Lifetime counters configured: Region A = %0d cycles | Region B = %0d cycles", LIFETIME_A, LIFETIME_B);
 
-        // Pulse lifetime_init to 255 for both regions
-        lifetime_init = {8'd255, 8'd255};
-        lifetime_ld   = 2'b11;
-        step_clk();
-        lifetime_ld   = 2'b00;
-
-        for (int r = 0; r < NUM_ROWS; r++) begin
+        for (int m = 0; m < K_STEPS; m++) begin
             for (int c = 0; c < HALF_COLS; c++) begin
-                hw_cnn_out[r][c] = '0;
+                hw_cnn_out[m][c] = '0;
             end
         end
 
         // Concurrent execution: Region A preloads weights, then computes WS.
         // Region B executes Native OS immediately without waiting for Region A preload.
-        for (int t = 0; t < K_STEPS + NUM_ROWS + HALF_COLS + 4; t++) begin
+        for (int t = 0; t < MAX_STEPS; t++) begin
             // Region A:
             if (t < HALF_COLS) begin
                 w_ld[0] = 1'b1;
@@ -254,7 +256,7 @@ module cosim_model3_hdf_tb;
                 t_a = t - HALF_COLS;
                 for (int r = 0; r < NUM_ROWS; r++) begin
                     m_idx = t_a - r;
-                    if (m_idx >= 0 && m_idx < NUM_ROWS) begin
+                    if (m_idx >= 0 && m_idx < K_STEPS) begin
                         set_din_w_a(r, cnn_inputs_mem[m_idx][r]);
                     end else begin
                         set_din_w_a(r, 8'd0);
@@ -263,13 +265,13 @@ module cosim_model3_hdf_tb;
                 for (int c = 0; c < HALF_COLS; c++) begin
                     set_din_n(c, 32'd0);
                     m_idx = t_a - (NUM_ROWS + 1 + c);
-                    if (m_idx >= 0 && m_idx < NUM_ROWS) begin
+                    if (m_idx >= 0 && m_idx < K_STEPS) begin
                         hw_cnn_out[m_idx][c] = $signed(dout_s[c*ACC_W +: ACC_W]);
                     end
                 end
-                if (t_a < NUM_ROWS) total_active_macs += (NUM_ROWS * HALF_COLS);
-                if (t == HALF_COLS + 2*NUM_ROWS + HALF_COLS) begin
-                    end_cycle_reg_a = cycle_count;
+                if (t_a < K_STEPS) total_active_macs += (NUM_ROWS * HALF_COLS);
+                if (t == LIFETIME_A - 1) begin
+                    end_cycle_reg_a = cycle_count + 1;
                 end
             end
 
@@ -291,6 +293,9 @@ module cosim_model3_hdf_tb;
                 end
             end
             if (t < K_STEPS) total_active_macs += (NUM_ROWS * HALF_COLS);
+            if (t == LIFETIME_B - 1) begin
+                end_cycle_reg_b = cycle_count + 1;
+            end
 
             step_clk();
         end
@@ -302,21 +307,27 @@ module cosim_model3_hdf_tb;
         w_ld           = 2'b00;
         step_clk();
 
-        if (end_cycle_reg_a == 0) end_cycle_reg_a = HALF_COLS + 2*NUM_ROWS + HALF_COLS;
-        end_cycle_reg_b = cycle_count;
+        end_cycle_reg_a = start_cycle_total + 1 + LIFETIME_A + 1;
+        end_cycle_reg_b = start_cycle_total + 1 + LIFETIME_B + 1;
 
         $display("Region A (CNN Native WS) Completed: %0d cycles", (end_cycle_reg_a - start_cycle_total));
         $display("Region B (ViT Native OS) Completed: %0d cycles (Zero reload stalls!)", (end_cycle_reg_b - start_cycle_total));
 
-        // Dump final combined hardware output: [Region A (WS) | Region B (OS)]
-        fp = $fopen({"benchmarks/results/", `SCALE_NAME, "/m3_multitenant_hw_output.txt"}, "w");
+        // Dump Region A output (K_STEPS x HALF_COLS)
+        fp = $fopen({"benchmarks/results/", `SCALE_NAME, "/m3_reg_a_hw_output.txt"}, "w");
+        for (int m = 0; m < K_STEPS; m++) begin
+            for (int c = 0; c < HALF_COLS; c++) begin
+                $fwrite(fp, "%0d ", hw_cnn_out[m][c]);
+            end
+            $fwrite(fp, "\n");
+        end
+        $fclose(fp);
+
+        // Dump Region B output (NUM_ROWS x HALF_COLS)
+        fp = $fopen({"benchmarks/results/", `SCALE_NAME, "/m3_reg_b_hw_output.txt"}, "w");
         for (int r = 0; r < NUM_ROWS; r++) begin
-            for (int c = 0; c < NUM_COLS; c++) begin
-                if (c < HALF_COLS) begin
-                    $fwrite(fp, "%0d ", hw_cnn_out[r][c]);
-                end else begin
-                    $fwrite(fp, "%0d ", get_pe_acc(r, c));
-                end
+            for (int c = HALF_COLS; c < NUM_COLS; c++) begin
+                $fwrite(fp, "%0d ", get_pe_acc(r, c));
             end
             $fwrite(fp, "\n");
         end
@@ -329,7 +340,7 @@ module cosim_model3_hdf_tb;
         $fwrite(fp, "  \"scale\": \"%s\",\n", `SCALE_NAME);
         $fwrite(fp, "  \"reg_a_cycles\": %0d,\n", (end_cycle_reg_a - start_cycle_total));
         $fwrite(fp, "  \"reg_b_cycles\": %0d,\n", (end_cycle_reg_b - start_cycle_total));
-        $fwrite(fp, "  \"total_makespan_cycles\": %0d,\n", (end_cycle_reg_b - start_cycle_total));
+        $fwrite(fp, "  \"total_makespan_cycles\": %0d,\n", (end_cycle_reg_a > end_cycle_reg_b ? end_cycle_reg_a - start_cycle_total : end_cycle_reg_b - start_cycle_total));
         $fwrite(fp, "  \"total_valid_macs\": %0d\n", total_active_macs);
         $fwrite(fp, "}\n");
         $fclose(fp);
@@ -338,7 +349,7 @@ module cosim_model3_hdf_tb;
         $display(" [SUMMARY: MODEL 3 POLYFLOW-NPU]");
         $display("   Region A (CNN Native WS) Cycles: %0d", (end_cycle_reg_a - start_cycle_total));
         $display("   Region B (ViT Native OS) Cycles: %0d", (end_cycle_reg_b - start_cycle_total));
-        $display("   Total Co-Run Makespan Cycles:    %0d", (end_cycle_reg_b - start_cycle_total));
+        $display("   Total Co-Run Makespan Cycles:    %0d", (end_cycle_reg_a > end_cycle_reg_b ? end_cycle_reg_a - start_cycle_total : end_cycle_reg_b - start_cycle_total));
         $display("   Total Useful MACs:               %0d", total_active_macs);
         $display("================================================================");
         $finish;

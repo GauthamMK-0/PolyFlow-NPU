@@ -82,19 +82,28 @@ module cosim_model2_sfa_tb;
     logic [DATA_W-1:0] vit_k_mem       [0:K_STEPS-1][0:NUM_ROWS-1];
 
     // Output capture buffers for Region A and Region B
-    logic signed [ACC_W-1:0] hw_cnn_out [0:NUM_ROWS-1][0:HALF_COLS-1];
+    logic signed [ACC_W-1:0] hw_cnn_out [0:K_STEPS-1][0:HALF_COLS-1];
     logic signed [ACC_W-1:0] hw_vit_out [0:NUM_ROWS-1][0:HALF_COLS-1];
     int m_idx;
     int tile_k_start;
     localparam int NUM_TILES = K_STEPS / NUM_ROWS;
+    localparam int TILE_COMP_LEN  = NUM_ROWS + NUM_ROWS + HALF_COLS + 2;
+    localparam int TILE_TOTAL_LEN = HALF_COLS + TILE_COMP_LEN;
+    localparam int TOTAL_CYCLES_A = HALF_COLS + K_STEPS + NUM_ROWS + HALF_COLS + 2;
+    localparam int TOTAL_CYCLES_B = NUM_TILES * TILE_TOTAL_LEN;
+    localparam int MAX_SIM_CYCLES = (TOTAL_CYCLES_A > TOTAL_CYCLES_B) ? TOTAL_CYCLES_A : TOTAL_CYCLES_B;
+
+    int cur_tile;
+    int sub_cycle;
+    int step_col;
+    int t_c;
+    int t_a;
 
     int cycle_count = 0;
     int start_cycle_total = 0;
     int end_cycle_reg_a = 0;
     int end_cycle_reg_b = 0;
     int total_active_macs = 0;
-    int reg_a_cycle = 0;
-    bit reg_a_done = 0;
 
     function automatic logic signed [ACC_W-1:0] get_pe_acc(int r, int c);
         return acc_out_flat[(r*NUM_COLS + c)*ACC_W +: ACC_W];
@@ -223,71 +232,39 @@ module cosim_model2_sfa_tb;
         $display("Dynamic Boundary Split applied at Col %0d (Mask = %b)", HALF_COLS, region_id_mask);
 
         // Initialize output capture buffers
+        for (int m = 0; m < K_STEPS; m++) begin
+            for (int c = 0; c < HALF_COLS; c++) begin
+                hw_cnn_out[m][c] = '0;
+            end
+        end
         for (int r = 0; r < NUM_ROWS; r++) begin
             for (int c = 0; c < HALF_COLS; c++) begin
-                hw_cnn_out[r][c] = '0;
                 hw_vit_out[r][c] = '0;
             end
         end
 
-        // Execute Region B in Tiled Weight-Stationary mode (NUM_TILES tiles).
-        // Region A executes concurrently during Tile 0.
-        for (int tile_idx = 0; tile_idx < NUM_TILES; tile_idx++) begin
-            tile_k_start = tile_idx * NUM_ROWS;
-
-            // --- Sub-phase 1: Weight Preload / Reload ---
-            // Region B reloads stationary weights for every tile (WS penalty)
-            // Region A preloads stationary weights only on Tile 0
-            w_ld[1]       = 1'b1;
-            compute_en[1] = 1'b0;
-            if (tile_idx == 0) begin
-                w_ld[0]       = 1'b1;
-                compute_en[0] = 1'b0;
-            end else begin
-                w_ld[0]       = 1'b0;
-                compute_en[0] = 1'b0;
-                din_w_region_a = '0;
-            end
-
-            for (int step = HALF_COLS - 1; step >= 0; step--) begin
-                for (int r = 0; r < NUM_ROWS; r++) begin
-                    set_din_w_b(r, vit_q_mem[tile_k_start + r][HALF_COLS + step]);
-                    if (tile_idx == 0) begin
-                        set_din_w_a(r, cnn_weights_mem[r][step]);
-                    end
-                end
-                step_clk();
-            end
-            w_ld = 2'b00;
-
-            // --- Sub-phase 2: Systolic Compute ---
-            compute_en[1] = 1'b1;
-            if (tile_idx == 0) compute_en[0] = 1'b1;
-
-            for (int t = 0; t < NUM_ROWS + NUM_ROWS + HALF_COLS + 2; t++) begin
-                // Region B systolic streaming:
-                for (int r = 0; r < NUM_ROWS; r++) begin
-                    m_idx = t - r;
-                    if (m_idx >= 0 && m_idx < NUM_ROWS) begin
-                        set_din_w_b(r, vit_k_mem[tile_k_start + r][m_idx]);
-                    end else begin
-                        set_din_w_b(r, 8'd0);
-                    end
-                end
-                for (int c = HALF_COLS; c < NUM_COLS; c++) begin
-                    set_din_n(c, 32'd0);
-                    m_idx = t - (NUM_ROWS + 1 + (c - HALF_COLS));
-                    if (m_idx >= 0 && m_idx < NUM_ROWS) begin
-                        hw_vit_out[m_idx][c - HALF_COLS] += $signed(dout_s[c*ACC_W +: ACC_W]);
-                    end
-                end
-                if (t < NUM_ROWS) total_active_macs += (NUM_ROWS * HALF_COLS);
-
-                // Region A systolic streaming (only on Tile 0):
-                if (tile_idx == 0) begin
+        // Concurrent execution:
+        // Region A: Native WS Conv2D across ALL K_STEPS activation vectors (1 weight preload + streaming)
+        // Region B: ViT Attention in Forced WS mode (NUM_TILES reload & compute cycles)
+        for (int cycle = 0; cycle < MAX_SIM_CYCLES; cycle++) begin
+            // --- Region A ---
+            if (cycle < TOTAL_CYCLES_A) begin
+                if (cycle < HALF_COLS) begin
+                    w_ld[0]       = 1'b1;
+                    compute_en[0] = 1'b0;
                     for (int r = 0; r < NUM_ROWS; r++) begin
-                        m_idx = t - r;
-                        if (m_idx >= 0 && m_idx < NUM_ROWS) begin
+                        set_din_w_a(r, cnn_weights_mem[r][HALF_COLS - 1 - cycle]);
+                    end
+                    for (int c = 0; c < HALF_COLS; c++) begin
+                        set_din_n(c, 32'd0);
+                    end
+                end else begin
+                    w_ld[0]       = 1'b0;
+                    compute_en[0] = 1'b1;
+                    t_a = cycle - HALF_COLS;
+                    for (int r = 0; r < NUM_ROWS; r++) begin
+                        m_idx = t_a - r;
+                        if (m_idx >= 0 && m_idx < K_STEPS) begin
                             set_din_w_a(r, cnn_inputs_mem[m_idx][r]);
                         end else begin
                             set_din_w_a(r, 8'd0);
@@ -295,42 +272,93 @@ module cosim_model2_sfa_tb;
                     end
                     for (int c = 0; c < HALF_COLS; c++) begin
                         set_din_n(c, 32'd0);
-                        m_idx = t - (NUM_ROWS + 1 + c);
-                        if (m_idx >= 0 && m_idx < NUM_ROWS) begin
+                        m_idx = t_a - (NUM_ROWS + 1 + c);
+                        if (m_idx >= 0 && m_idx < K_STEPS) begin
                             hw_cnn_out[m_idx][c] = $signed(dout_s[c*ACC_W +: ACC_W]);
                         end
                     end
-                    if (t < NUM_ROWS) total_active_macs += (NUM_ROWS * HALF_COLS);
-                end else begin
-                    din_w_region_a = '0;
+                    if (t_a < K_STEPS) total_active_macs += (NUM_ROWS * HALF_COLS);
                 end
-
-                step_clk();
+            end else begin
+                w_ld[0]        = 1'b0;
+                compute_en[0]  = 1'b0;
+                din_w_region_a = '0;
             end
 
-            compute_en     = 2'b00;
-            din_w_region_a = '0;
-            din_w_region_b = '0;
+            // --- Region B ---
+            if (cycle < TOTAL_CYCLES_B) begin
+                cur_tile     = cycle / TILE_TOTAL_LEN;
+                sub_cycle    = cycle % TILE_TOTAL_LEN;
+                tile_k_start = cur_tile * NUM_ROWS;
+
+                if (sub_cycle < HALF_COLS) begin
+                    // Preload / Reload weights for current tile
+                    w_ld[1]       = 1'b1;
+                    compute_en[1] = 1'b0;
+                    step_col      = HALF_COLS - 1 - sub_cycle;
+                    for (int r = 0; r < NUM_ROWS; r++) begin
+                        set_din_w_b(r, vit_q_mem[tile_k_start + r][HALF_COLS + step_col]);
+                    end
+                end else begin
+                    // Systolic compute for current tile
+                    w_ld[1]       = 1'b0;
+                    compute_en[1] = 1'b1;
+                    t_c           = sub_cycle - HALF_COLS;
+                    for (int r = 0; r < NUM_ROWS; r++) begin
+                        m_idx = t_c - r;
+                        if (m_idx >= 0 && m_idx < NUM_ROWS) begin
+                            set_din_w_b(r, vit_k_mem[tile_k_start + r][m_idx]);
+                        end else begin
+                            set_din_w_b(r, 8'd0);
+                        end
+                    end
+                    for (int c = HALF_COLS; c < NUM_COLS; c++) begin
+                        set_din_n(c, 32'd0);
+                        m_idx = t_c - (NUM_ROWS + 1 + (c - HALF_COLS));
+                        if (m_idx >= 0 && m_idx < NUM_ROWS) begin
+                            hw_vit_out[m_idx][c - HALF_COLS] += $signed(dout_s[c*ACC_W +: ACC_W]);
+                        end
+                    end
+                    if (t_c < NUM_ROWS) total_active_macs += (NUM_ROWS * HALF_COLS);
+                end
+            end else begin
+                w_ld[1]        = 1'b0;
+                compute_en[1]  = 1'b0;
+                din_w_region_b = '0;
+            end
+
             step_clk();
-
-            if (tile_idx == 0) begin
-                end_cycle_reg_a = cycle_count;
-                $display("Region A (CNN Native WS) Completed: %0d cycles", (end_cycle_reg_a - start_cycle_total));
-            end
         end
 
-        end_cycle_reg_b = cycle_count;
+        // Drain final registers
+        din_n          = '0;
+        din_w_region_a = '0;
+        din_w_region_b = '0;
+        w_ld           = 2'b00;
+        compute_en     = 2'b00;
+        step_clk();
+
+        end_cycle_reg_a = start_cycle_total + 1 + TOTAL_CYCLES_A + 1;
+        end_cycle_reg_b = start_cycle_total + 1 + TOTAL_CYCLES_B + 1;
+
+        $display("Region A (CNN Native WS) Completed: %0d cycles", (end_cycle_reg_a - start_cycle_total));
         $display("Region B (ViT Forced WS) Completed: %0d cycles (Stretched by per-tile WS reload)", (end_cycle_reg_b - start_cycle_total));
 
-        // Dump hardware output: [Region A | Region B]
-        fp = $fopen({"benchmarks/results/", `SCALE_NAME, "/m2_multitenant_hw_output.txt"}, "w");
+        // Dump Region A output (K_STEPS x HALF_COLS)
+        fp = $fopen({"benchmarks/results/", `SCALE_NAME, "/m2_reg_a_hw_output.txt"}, "w");
+        for (int m = 0; m < K_STEPS; m++) begin
+            for (int c = 0; c < HALF_COLS; c++) begin
+                $fwrite(fp, "%0d ", hw_cnn_out[m][c]);
+            end
+            $fwrite(fp, "\n");
+        end
+        $fclose(fp);
+
+        // Dump Region B output (NUM_ROWS x HALF_COLS)
+        fp = $fopen({"benchmarks/results/", `SCALE_NAME, "/m2_reg_b_hw_output.txt"}, "w");
         for (int r = 0; r < NUM_ROWS; r++) begin
-            for (int c = 0; c < NUM_COLS; c++) begin
-                if (c < HALF_COLS) begin
-                    $fwrite(fp, "%0d ", hw_cnn_out[r][c]);
-                end else begin
-                    $fwrite(fp, "%0d ", hw_vit_out[r][c - HALF_COLS]);
-                end
+            for (int c = 0; c < HALF_COLS; c++) begin
+                $fwrite(fp, "%0d ", hw_vit_out[r][c]);
             end
             $fwrite(fp, "\n");
         end
