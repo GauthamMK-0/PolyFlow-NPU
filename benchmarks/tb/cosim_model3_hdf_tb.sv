@@ -270,9 +270,6 @@ module cosim_model3_hdf_tb;
                     end
                 end
                 if (t_a < K_STEPS) total_active_macs += (NUM_ROWS * HALF_COLS);
-                if (t == LIFETIME_A - 1) begin
-                    end_cycle_reg_a = cycle_count + 1;
-                end
             end
 
             // Region B:
@@ -293,11 +290,11 @@ module cosim_model3_hdf_tb;
                 end
             end
             if (t < K_STEPS) total_active_macs += (NUM_ROWS * HALF_COLS);
-            if (t == LIFETIME_B - 1) begin
-                end_cycle_reg_b = cycle_count + 1;
-            end
 
             step_clk();
+            if (t == LIFETIME_B) begin
+                end_cycle_reg_b = cycle_count;
+            end
         end
 
         // Drain final registers
@@ -306,9 +303,7 @@ module cosim_model3_hdf_tb;
         din_w_region_b = '0;
         w_ld           = 2'b00;
         step_clk();
-
-        end_cycle_reg_a = start_cycle_total + 1 + LIFETIME_A + 1;
-        end_cycle_reg_b = start_cycle_total + 1 + LIFETIME_B + 1;
+        end_cycle_reg_a = cycle_count;
 
         $display("Region A (CNN Native WS) Completed: %0d cycles", (end_cycle_reg_a - start_cycle_total));
         $display("Region B (ViT Native OS) Completed: %0d cycles (Zero reload stalls!)", (end_cycle_reg_b - start_cycle_total));

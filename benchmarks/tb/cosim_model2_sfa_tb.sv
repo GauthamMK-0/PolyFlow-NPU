@@ -328,6 +328,9 @@ module cosim_model2_sfa_tb;
             end
 
             step_clk();
+            if (cycle == TOTAL_CYCLES_A) begin
+                end_cycle_reg_a = cycle_count;
+            end
         end
 
         // Drain final registers
@@ -337,9 +340,7 @@ module cosim_model2_sfa_tb;
         w_ld           = 2'b00;
         compute_en     = 2'b00;
         step_clk();
-
-        end_cycle_reg_a = start_cycle_total + 1 + TOTAL_CYCLES_A + 1;
-        end_cycle_reg_b = start_cycle_total + 1 + TOTAL_CYCLES_B + 1;
+        end_cycle_reg_b = cycle_count;
 
         $display("Region A (CNN Native WS) Completed: %0d cycles", (end_cycle_reg_a - start_cycle_total));
         $display("Region B (ViT Forced WS) Completed: %0d cycles (Stretched by per-tile WS reload)", (end_cycle_reg_b - start_cycle_total));

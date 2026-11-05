@@ -87,6 +87,8 @@ module dfs_top_tb;
         step_clk();
     endtask
 
+    logic signed [ACC_W-1:0] exp_val;
+
     initial begin
         $display("================================================================");
         $display(" [TESTSUITE] Starting Dataflow Switching Model (Model 1) Tests");
@@ -103,27 +105,36 @@ module dfs_top_tb;
         step_clk();
         tile_acc_clr      = 0;
 
-        // Step 1.1: Preload stationary weights from West into row 0
+        // Step 1.1: Preload stationary weights across all NUM_COLS columns via West-to-East shift
         tile_w_ld = 1;
-        for (int r = 0; r < NUM_ROWS; r++) begin
-            set_din_w(r, 8'd5); // Stationary weight = 5
+        for (int step = NUM_COLS - 1; step >= 0; step--) begin
+            for (int r = 0; r < NUM_ROWS; r++) begin
+                set_din_w(r, 8'd5 + step[7:0]); // Stationary weight = 5 + c
+            end
+            step_clk();
         end
-        step_clk();
         tile_w_ld = 0;
 
-        // Step 1.2: Stream activation inputs through West port (combinational product)
+        // Step 1.2: Stream activation inputs through West port (combinational product & vertical psum)
         tile_compute_en = 1;
         for (int r = 0; r < NUM_ROWS; r++) begin
             set_din_w(r, 8'd3); // Activation = 3
         end
-        step_clk(); // Combinational product: 5 * 3 = 15
+        step_clk();
 
-        $display("WS Mode (Combinational): PE[0][0] Product = %0d (Expected: 15)", get_pe_acc(0,0));
-        if (get_pe_acc(0,0) !== 32'd15) begin
-            $display("ERROR: WS Mode calculation mismatch!");
-            error_count++;
-        end else begin
-            $display("PASS: WS Mode combinational MAC verified successfully.");
+        $display("WS Mode (Combinational): PE[0][0] = %0d (Exp: 15), PE[3][3] = %0d (Exp: 96)",
+                 get_pe_acc(0,0), get_pe_acc(3,3));
+        for (int r = 0; r < NUM_ROWS; r++) begin
+            for (int c = 0; c < NUM_COLS; c++) begin
+                exp_val = (r + 1) * 32'd3 * (32'd5 + c);
+                if (get_pe_acc(r, c) !== exp_val) begin
+                    $display("ERROR: WS Mode mismatch at PE[%0d][%0d]: %0d (Exp: %0d)", r, c, get_pe_acc(r, c), exp_val);
+                    error_count++;
+                end
+            end
+        end
+        if (error_count == 0) begin
+            $display("PASS: WS Mode combinational MAC verified across all 16 PEs.");
         end
         tile_compute_en = 0;
 
@@ -138,27 +149,36 @@ module dfs_top_tb;
 
         // In OS mode, operands stream simultaneously from North (Q) and West (K)
         tile_compute_en = 1;
-        // Cycle 1: Q=4, K=7 -> prod = 28
+        // Cycle 1: Q=4, K=7 -> prod = 28 across all PEs
         for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 32'd4);
         for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd7);
         step_clk();
 
-        $display("OS Mode (Cycle 1): PE[0][0] Product = %0d (Expected: 28)", get_pe_acc(0,0));
-        if (get_pe_acc(0,0) !== 32'd28) begin
-            $display("ERROR: OS Mode calculation mismatch!");
-            error_count++;
-        end else begin
-            $display("PASS: OS Mode combinational MAC verified successfully.");
+        $display("OS Mode (Cycle 1): Verifying all 16 PEs (Expected: 28)");
+        for (int r = 0; r < NUM_ROWS; r++) begin
+            for (int c = 0; c < NUM_COLS; c++) begin
+                if (get_pe_acc(r, c) !== 32'd28) begin
+                    $display("ERROR: OS Mode cycle 1 mismatch at PE[%0d][%0d]: %0d", r, c, get_pe_acc(r, c));
+                    error_count++;
+                end
+            end
         end
 
-        // Cycle 2: Q=2, K=6 -> prod = 12
+        // Cycle 2: Q=2, K=6 -> prod = 12 across all PEs
         for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 32'd2);
         for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd6);
         step_clk();
 
-        if (get_pe_acc(0,0) !== 32'd12) begin
-            $display("ERROR: OS Mode cycle 2 mismatch!");
-            error_count++;
+        for (int r = 0; r < NUM_ROWS; r++) begin
+            for (int c = 0; c < NUM_COLS; c++) begin
+                if (get_pe_acc(r, c) !== 32'd12) begin
+                    $display("ERROR: OS Mode cycle 2 mismatch at PE[%0d][%0d]: %0d", r, c, get_pe_acc(r, c));
+                    error_count++;
+                end
+            end
+        end
+        if (error_count == 0) begin
+            $display("PASS: OS Mode combinational MAC verified across all 16 PEs.");
         end
         tile_compute_en = 0;
 
@@ -171,23 +191,30 @@ module dfs_top_tb;
         step_clk();
         tile_acc_clr      = 0;
 
-        // Preload activation from North
+        // Preload activation from North across all NUM_ROWS rows
         tile_w_ld = 1;
-        for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 32'd6); // Stationary activation = 6
-        step_clk();
+        for (int step = NUM_ROWS - 1; step >= 0; step--) begin
+            for (int c = 0; c < NUM_COLS; c++) set_din_n(c, 32'd6); // Stationary activation = 6
+            step_clk();
+        end
         tile_w_ld = 0;
 
-        // Stream weights from West: weight = 4 -> instantaneous prod = 24
+        // Stream weights from West: weight = 4 -> instantaneous prod = 24 across all PEs
         tile_compute_en = 1;
         for (int r = 0; r < NUM_ROWS; r++) set_din_w(r, 8'd4);
         step_clk(); // 6 * 4 = 24
 
-        $display("IS Mode (Combinational): PE[0][0] Product = %0d (Expected: 24)", get_pe_acc(0,0));
-        if (get_pe_acc(0,0) !== 32'd24) begin
-            $display("ERROR: IS Mode calculation mismatch!");
-            error_count++;
-        end else begin
-            $display("PASS: IS Mode combinational MAC verified successfully.");
+        $display("IS Mode (Combinational): Verifying all 16 PEs (Expected: 24)");
+        for (int r = 0; r < NUM_ROWS; r++) begin
+            for (int c = 0; c < NUM_COLS; c++) begin
+                if (get_pe_acc(r, c) !== 32'd24) begin
+                    $display("ERROR: IS Mode mismatch at PE[%0d][%0d]: %0d", r, c, get_pe_acc(r, c));
+                    error_count++;
+                end
+            end
+        end
+        if (error_count == 0) begin
+            $display("PASS: IS Mode combinational MAC verified across all 16 PEs.");
         end
         tile_compute_en = 0;
 
