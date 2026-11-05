@@ -3,20 +3,23 @@
 ## 1. Overview
 This directory contains our **Novel Proposed Architecture** (PolyFlow-NPU / Configuration C).
 
-### Key Innovations
+### Key Microarchitectural Innovations
 1. **Concurrent Spatial Multi-Tenancy:** The physical systolic array dynamically divides into independent execution regions (Region A and Region B) at dispatch time via `cfg_split_col`.
 2. **Independent Per-Region Dataflow Freedom:** Unlike prior spatial accelerators (e.g. Planaria) that freeze all sub-arrays into Weight-Stationary, each region independently selects its mathematically optimal dataflow at runtime:
    - **Region A:** Can run a CNN backbone in **Weight-Stationary (WS)** mode.
    - **Region B:** Can simultaneously run Transformer Self-Attention in **Output-Stationary (OS)** mode on the exact same clock cycles.
-3. **Two-Stage Pipelined MAC with 3:2 Carry-Save Accumulator (CSA):**
-   - **Stage 1 (Product Generation):** Registers the 16-bit signed product (`mul_a * mul_b`).
+3. **32-Bit Vertical Partial-Sum Mesh & Registered Systolic Forwarding:**
+   - Widened vertical ports (`din_n` / `dout_s`) to 32 bits (`ACC_W = 32`), preventing accumulation overflow.
+   - True registered inter-PE forwarding (`1 hop/cycle`) eliminates combinational ripple loops and bounds critical paths within a single PE.
+4. **Two-Stage Pipelined MAC with 3:2 Carry-Save Accumulator (CSA):**
+   - **Stage 1 (Product Generation):** Registers the 16-bit signed product (`mul_a * mul_b`) with synchronous control pipelining (`compute_pipe`, `df_mode_pipe`).
    - **Stage 2 (Redundant Accumulation):** Employs dual 32-bit state vectors (`acc_sum` and `acc_carry`) with parallel 3:2 compressor adders, eliminating carry rippling from the feedback loop and providing $+1.200\text{ ns}$ setup slack at 200 MHz.
-4. **Hardware Boundary Isolation:** Inter-region systolic mesh connections are zeroed at runtime, preventing cross-tenant operand bleeding.
-5. **Phase-Driven Memory Bandwidth Arbiter (EPPA):** Arbitrates memory bandwidth only on phase transitions (`BURST`, `IDLE`, `STREAM`, `RECONFIG`) and pins allocations quasi-statically, taking dynamic arbitration off the high-frequency clock path.
-6. **Decentralized Memory Ownership & Anti-Leakage (OTP + Scrub):**
+5. **Hardware Boundary Isolation:** Inter-region systolic mesh connections are zeroed at runtime, preventing cross-tenant operand bleeding.
+6. **Phase-Driven Memory Bandwidth Arbiter (EPPA):** Arbitrates memory bandwidth only on phase transitions (`BURST`, `IDLE`, `STREAM`, `RECONFIG`) and pins allocations quasi-statically, taking dynamic arbitration off the high-frequency clock path.
+7. **Decentralized Memory Ownership & Anti-Leakage (OTP + Scrub):**
    - Single-writer ownership token protocol with epoch-rotating priority guarantees mutual exclusion without starvation or side-channel leakage.
    - Mandatory 4-cycle hardware zeroing scrub clears residual tenant data before releasing memory banks to new owners.
-7. **Lifetime Counter:** Gates MAC execution during boundary shifts, gracefully draining in-flight partial sums.
+8. **Hardware Auto-Gating Lifetime Counter:** An 8-bit lifetime counter (`LIFETIME_W = 8`) auto-gates PEs upon completing allocated computation windows (up to 255 cycles), cutting dynamic power to zero while co-tenants finish.
 
 ---
 
@@ -24,7 +27,7 @@ This directory contains our **Novel Proposed Architecture** (PolyFlow-NPU / Conf
 ```
 models/pipelined/heterogeneous_fission/
 ├── rtl/
-│   ├── hdf_pe.sv              # Heterogeneous PE with WS/OS/IS, CSA accumulator, lifetime counter
+│   ├── hdf_pe.sv              # Heterogeneous PE with WS/OS/IS, CSA accumulator, 8-bit lifetime counter
 │   ├── hdf_fission_decoder.sv # Parameterized dynamic column partition decoder
 │   ├── hdf_array_grid.sv      # Parameterized 2D array grid with dynamic boundary isolation
 │   ├── eppa_arbiter.sv        # Event-driven phase-pinned bandwidth arbiter
@@ -34,9 +37,9 @@ models/pipelined/heterogeneous_fission/
 │   ├── hdf_top_8x8.sv         # Dedicated 8x8 scaled pod wrapper
 │   └── hdf_top_16x16.sv       # Dedicated 16x16 full pod wrapper
 ├── tb/
-│   ├── hdf_top_tb.sv          # 4x4 baseline co-execution testbench
-│   ├── hdf_top_8x8_tb.sv      # 8x8 scaled pod co-execution testbench (64 PEs)
-│   └── hdf_top_16x16_tb.sv    # 16x16 full pod co-execution testbench (256 PEs)
+│   ├── hdf_top_tb.sv          # 4x4 baseline co-execution testbench (exhaustive 16-PE assertions)
+│   ├── hdf_top_8x8_tb.sv      # 8x8 scaled pod testbench (exhaustive 64-PE assertions)
+│   └── hdf_top_16x16_tb.sv    # 16x16 full pod testbench (exhaustive 256-PE assertions)
 ├── reports/                   # Cadence Genus & Innovus synthesis/PnR reports
 │   ├── 4x4/                   # 4x4 baseline reports (timing, area, power, qor, gates)
 │   ├── 8x8/                   # 8x8 scaled pod reports
@@ -73,18 +76,18 @@ Model 3 supports parameterized array scaling via `SCALE`:
 
 | Dimension | Processing Elements | Flip-Flop Count | Memory Banks | Split Width (`SPLIT_W`) | Drain Window (`LIFETIME_W`) | INT8 Throughput (@ 200 MHz) | Primary Testbench |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **4x4** (Baseline) | 16 PEs | 1,504 flops | 2 Banks | 4 bits (`[3:0]`) | 4 bits (15 cyc) | 6.4 GOPS | `tb/hdf_top_tb.sv` |
-| **8x8** (Scaled Pod) | 64 PEs | 6,016 flops | 2 Banks | 4 bits (`[3:0]`) | 4 bits (15 cyc) | 25.6 GOPS | `tb/hdf_top_8x8_tb.sv` |
-| **16x16** (Full Pod) | 256 PEs | 24,064 flops | 4 Banks | 5 bits (`[4:0]`) | 5 bits (31 cyc) | 102.4 GOPS | `tb/hdf_top_16x16_tb.sv` |
+| **4x4** (Baseline) | 16 PEs | 1,504 flops | 2 Banks | 4 bits (`[3:0]`) | 8 bits (up to 255 cyc) | 6.40 GOPS | `tb/hdf_top_tb.sv` |
+| **8x8** (Scaled Pod) | 64 PEs | 6,016 flops | 2 Banks | 4 bits (`[3:0]`) | 8 bits (up to 255 cyc) | 25.60 GOPS | `tb/hdf_top_8x8_tb.sv` |
+| **16x16** (Full Pod) | 256 PEs | 24,064 flops | 4 Banks | 5 bits (`[4:0]`) | 8 bits (up to 255 cyc) | 102.40 GOPS | `tb/hdf_top_16x16_tb.sv` |
 
 ---
 
 ## 4. Verification & Simulation
 
 ### Testbench Architecture
-The testbenches validate concurrent heterogeneous multi-tenancy:
+The testbenches validate concurrent heterogeneous multi-tenancy with **exhaustive 2D PE coverage**:
 1. **Dynamic Column Partitioning:** Configures split column and verifies `region_id_mask`.
-2. **Concurrent Heterogeneous Co-Execution:** Simultaneously executes Region A in Weight-Stationary (WS) mode and Region B in Output-Stationary (OS) mode with verified mathematical correctness.
+2. **Concurrent Heterogeneous Co-Execution:** Simultaneously executes Region A in Weight-Stationary (WS) mode and Region B in Output-Stationary (OS) mode using systolic diamond skew, asserting mathematical correctness across **100% of all PEs** ($16/16$, $64/64$, $256/256$).
 3. **EPPA Memory Bandwidth Arbitration:** Dynamically arbitrates bandwidth based on phase profiles (`BURST` vs `STREAM`).
 4. **Memory Bank Ownership Migration & Scrubbing:** Validates the 4-cycle hardware zeroing scrub sequence and `bank_role_clear` handshake.
 

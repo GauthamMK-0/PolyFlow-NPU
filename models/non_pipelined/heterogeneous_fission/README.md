@@ -8,6 +8,7 @@ This directory contains the **Non-Pipelined Combinational Baseline** of our Hete
 * **Independent Per-Region Dataflow Freedom:** Each region independently selects its mathematically optimal dataflow at runtime:
   - **Region A:** Can run a CNN backbone in **Weight-Stationary (WS)** mode.
   - **Region B:** Can simultaneously run Transformer Self-Attention in **Output-Stationary (OS)** mode.
+* **32-Bit Vertical Partial-Sum Mesh:** Vertical ports (`din_n` / `dout_s`) are widened to 32 bits (`ACC_W = 32`), providing bit-for-bit mathematical parity with the pipelined model without accumulator overflow.
 * **Single-Cycle Combinational MAC Baseline:** Implements single-cycle combinational multiplier-accumulator logic, serving as the timing, power, and area baseline to quantify the performance and clock frequency gains offered by the pipelined carry-save accumulator (CSA) design.
 * **Hardware Boundary Isolation:** Inter-region systolic mesh connections are zeroed at runtime, preventing cross-tenant operand bleeding.
 * **Phase-Driven Memory Bandwidth Arbiter (EPPA):** Quasi-static bandwidth allocation driven by tenant execution phases (`BURST` vs `STREAM`).
@@ -19,7 +20,7 @@ This directory contains the **Non-Pipelined Combinational Baseline** of our Hete
 ```
 models/non_pipelined/heterogeneous_fission/
 ├── rtl/
-│   ├── hdf_pe.sv              # Heterogeneous PE with WS/OS/IS (combinational MAC)
+│   ├── hdf_pe.sv              # Heterogeneous PE with WS/OS/IS (combinational MAC, 32-bit psum)
 │   ├── hdf_fission_decoder.sv # Dynamic column partition decoder
 │   ├── hdf_array_grid.sv      # 2D array grid with dynamic boundary isolation
 │   ├── eppa_arbiter.sv        # Event-driven phase-pinned bandwidth arbiter
@@ -27,7 +28,7 @@ models/non_pipelined/heterogeneous_fission/
 │   ├── pod_bank_scrub.sv      # 4-cycle zeroing scrub controller
 │   └── hdf_top.sv             # Top-level unified heterogeneous fission pod (4x4 baseline)
 ├── tb/
-│   └── hdf_top_tb.sv          # Standalone SystemVerilog co-execution testbench
+│   └── hdf_top_tb.sv          # Standalone SystemVerilog co-execution testbench (exhaustive 16 PEs)
 ├── reports/                   # Cadence Genus & Innovus synthesis/PnR reports
 │   ├── 4x4/                   # 4x4 baseline reports (timing, area, power, qor, gates)
 │   ├── 8x8/                   # 8x8 scaled pod reports
@@ -50,8 +51,8 @@ models/non_pipelined/heterogeneous_fission/
 │   ├── 8x8/                   # Checkpoints for 8x8
 │   └── 16x16/                 # Checkpoints for 16x16
 ├── hdf_top.sdc                # SDC timing constraints (200 MHz / 5.000 ns clock target)
-├── synth_hdf.tcl              # Multi-scale Cadence Genus synthesis script
-├── pnr_place_hdf.tcl          # Multi-scale Cadence Innovus physical design script
+├── synth_hdf.tcl              # Cadence Genus synthesis script
+├── pnr_place_hdf.tcl          # Cadence Innovus physical design script
 ├── Makefile                   # Automation Makefile for simulation, synthesis, and PnR
 └── README.md
 ```
@@ -63,8 +64,7 @@ models/non_pipelined/heterogeneous_fission/
 ### Simulation Commands
 ```bash
 # Fast Icarus Verilog simulation:
-make test-4x4       # Run 4x4 baseline simulation (output in output/4x4/)
-make iverilog       # Alias to test-4x4
+make test-4x4       # Run 4x4 baseline simulation verifying all 16 PEs (output in output/4x4/)
 
 # Cadence Xcelium simulation:
 make run SCALE=4x4  # Headless batch simulation
@@ -75,17 +75,21 @@ make verilator-4x4
 
 # Linting & Cleanup:
 make lint           # Strict Verilator linting (-Wall --timing)
-make clean          # Clean temporary sandbox files without deleting tracked reports
+make clean          # Clean simulation sandboxes without deleting tracked reports
 ```
 
 ---
 
-## 4. ASIC Logic Synthesis & Physical Design (90nm)
+## 4. ASIC Logic Synthesis (Cadence Genus @ 200 MHz)
 
 ```bash
-# Cadence Genus logic synthesis:
-make synth-4x4          # Synthesize 4x4 netlist and reports (reports/4x4/, netlist/4x4/)
+make synth-4x4      # Synthesize 4x4 netlist and reports (reports/4x4/, netlist/4x4/)
+```
 
-# Cadence Innovus physical design:
-make pnr-place-4x4      # Complete PnR flow for 4x4 (outputs in outputs/4x4/, db/4x4/)
+---
+
+## 5. Physical Design & Implementation (Cadence Innovus)
+
+```bash
+make pnr-place-4x4  # Complete PnR flow for 4x4 (outputs in outputs/4x4/, db/4x4/)
 ```

@@ -7,11 +7,15 @@ This directory contains the standalone **Spatial Fission Model** (corresponding 
 * **Spatial Multi-Tenancy (Fission):** A single physical PE array is dynamically partitioned into two independently operating regions (Region A and Region B) via dispatch-time column splitting (`cfg_split_col`).
 * **Hardware Boundary Isolation:** Inter-region horizontal forwarding wires are dynamically forced to zero at column boundaries, preventing cross-tenant operand bleeding.
 * **Homogeneous Dataflow Constraint:** All partitioned regions are locked to the same global dataflow (**Weight-Stationary**). This captures the fundamental limitation of prior spatial multi-tenant accelerators.
+* **32-Bit Vertical Partial-Sum Mesh & Registered Systolic Forwarding:**
+  - Upgraded vertical channels to 32 bits (`ACC_W = 32`) to eliminate accumulation overflow.
+  - Every inter-PE hop is registered (`1 hop/cycle`), preventing combinational ripple loops.
+* **Two-Stage Pipelined MAC with 3:2 Carry-Save Accumulator (CSA):**
+  - Eliminates recursive accumulation delay bottlenecks using registered product stages (`product_reg`) and redundant carry-save accumulator (CSA) loops (`acc_sum`, `acc_carry`).
 * **Shared Memory Substrate:** Memory banks are arbitrated via:
   - Single-writer ownership token protocol (**OTP**) with rotating epoch priority.
   - Mandatory **4-cycle hardware zeroing scrub controller** before bank role migration.
   - Event-driven phase-pinned memory bandwidth arbiter (**EPPA**).
-* **Two-Stage Pipelined MAC:** Eliminates recursive accumulation delay bottlenecks using registered product stages and redundant carry-save accumulator (CSA) loops.
 
 ---
 
@@ -29,9 +33,9 @@ models/pipelined/spatial_fission/
 │   ├── sfa_top_8x8.sv         # Dedicated 8x8 scaled pod wrapper
 │   └── sfa_top_16x16.sv       # Dedicated 16x16 full pod wrapper
 ├── tb/
-│   ├── sfa_top_tb.sv          # 4x4 baseline testbench
-│   ├── sfa_top_8x8_tb.sv      # 8x8 scaled pod testbench (64 PEs)
-│   └── sfa_top_16x16_tb.sv    # 16x16 full pod testbench (256 PEs)
+│   ├── sfa_top_tb.sv          # 4x4 baseline testbench (exhaustive 16-PE assertions)
+│   ├── sfa_top_8x8_tb.sv      # 8x8 scaled pod testbench (exhaustive 64-PE assertions)
+│   └── sfa_top_16x16_tb.sv    # 16x16 full pod testbench (exhaustive 256-PE assertions)
 ├── reports/                   # Cadence Genus & Innovus synthesis/PnR reports
 │   ├── 4x4/                   # 4x4 baseline reports (timing, area, power, qor, gates)
 │   ├── 8x8/                   # 8x8 scaled pod reports
@@ -68,20 +72,20 @@ Model 2 supports parameterized array dimensions configured via `SCALE`:
 
 | Dimension | Processing Elements | Memory Banks | Split Width (`SPLIT_W`) | INT8 Throughput (@ 200 MHz) | Primary Testbench |
 | :---: | :---: | :---: | :---: | :---: | :--- |
-| **4x4** (Baseline) | 16 PEs | 2 Banks | 4 bits (`[3:0]`) | 6.4 GOPS | `tb/sfa_top_tb.sv` |
-| **8x8** (Scaled Pod) | 64 PEs | 2 Banks | 4 bits (`[3:0]`) | 25.6 GOPS | `tb/sfa_top_8x8_tb.sv` |
-| **16x16** (Full Pod) | 256 PEs | 4 Banks | 5 bits (`[4:0]`) | 102.4 GOPS | `tb/sfa_top_16x16_tb.sv` |
+| **4x4** (Baseline) | 16 PEs | 2 Banks | 4 bits (`[3:0]`) | 6.40 GOPS | `tb/sfa_top_tb.sv` |
+| **8x8** (Scaled Pod) | 64 PEs | 2 Banks | 4 bits (`[3:0]`) | 25.60 GOPS | `tb/sfa_top_8x8_tb.sv` |
+| **16x16** (Full Pod) | 256 PEs | 4 Banks | 5 bits (`[4:0]`) | 102.40 GOPS | `tb/sfa_top_16x16_tb.sv` |
 
 ---
 
 ## 4. Verification & Simulation
 
 ### Testbench Architecture
-The testbenches validate concurrent multi-tenancy and shared resource arbitration:
-1. **Dynamic Column Partitioning:** Tests dynamic column splits (e.g. `cfg_split_col = 2` on 4x4, `4` on 8x8, `8` on 16x16) and verifies `region_id_mask`.
-2. **Concurrent WS Co-Execution:** Executes Region A and Region B concurrently across the partitioned boundary, verifying correct mathematical results in both regions.
-3. **EPPA Memory Bandwidth Arbitration:** Validates dynamic bandwidth allocation across differing tenant memory phases.
-4. **Shared Memory Scrubbing:** Validates the 4-cycle hardware zeroing scrub sequence and `bank_role_clear` handshake.
+The testbenches validate concurrent multi-tenancy and shared resource arbitration with **exhaustive 2D grid assertions**:
+1. **Dynamic Column Partitioning:** Confirms split decoding and boundary isolation mask (`region_id_mask`).
+2. **Concurrent Multi-Tenant WS Execution:** Co-executes distinct matrix workloads in Region A and Region B simultaneously, verifying mathematical correctness across **100% of all PEs** ($16/16$, $64/64$, $256/256$).
+3. **EPPA Memory Bandwidth Arbitration:** Dynamically arbitrates memory bandwidth across regions based on phase indicators (`BURST` vs `STREAM`).
+4. **Memory Scrubbing & Handshakes:** Exercises the 4-cycle hardware scrub state machine and `bank_role_clear` ownership transfers.
 
 ### Simulation Commands
 ```bash
@@ -110,8 +114,6 @@ make clean          # Clean simulation sandboxes without deleting tracked report
 
 ## 5. ASIC Logic Synthesis (Cadence Genus @ 200 MHz)
 
-Model 2 is configured for multi-scale logic synthesis mapped to standard cells (`slow.lib`) using Cadence Genus:
-
 ```bash
 make synth-4x4      # Synthesize 4x4 netlist and reports (reports/4x4/, netlist/4x4/)
 make synth-8x8      # Synthesize 8x8 netlist and reports (reports/8x8/, netlist/8x8/)
@@ -119,18 +121,9 @@ make synth-16x16    # Synthesize 16x16 netlist and reports (reports/16x16/, netl
 make synth-scaling  # Synthesize all scales sequentially
 ```
 
-### Synthesis Specifications & Optimizations
-- **Target Frequency**: **200 MHz** ($T_{\text{clk}} = 5.000\text{ ns}$)
-- **I/O Delay Budget**: $0.500\text{ ns}$ (10% of clock period)
-- **Clock Uncertainty**: $0.050\text{ ns}$ (setup margin)
-- **Boundary Optimization**: Pre-decoded boundary column flags (`is_boundary_col`) eliminate row-level boundary MUX delays
-- **Timing Headroom**: Single-cycle datapath achieves robust positive setup slack ($\ge +1.5\text{ ns}$) across all paths
-
 ---
 
 ## 6. Physical Design & Implementation (Cadence Innovus)
-
-Model 2 includes a complete physical design flow (Floorplanning, Power Grid, Placement, CTS, Detailed Routing, Signoff):
 
 ```bash
 make pnr-place-4x4      # Complete PnR flow for 4x4 (outputs in outputs/4x4/, db/4x4/)
@@ -138,7 +131,3 @@ make pnr-place-8x8      # Complete PnR flow for 8x8 (outputs in outputs/8x8/, db
 make pnr-place-16x16    # Complete PnR flow for 16x16 (outputs in outputs/16x16/, db/16x16/)
 make pnr-place-scaling  # PnR across all scales
 ```
-
-- **Standard Cell Library**: 90nm bulk CMOS (`gsclib090_translated.lef`)
-- **Clock Tree Synthesis**: CCOpt clock tree engine with non-default NDR rules (`2w2s`)
-- **Deliverables**: Placed & routed DEF (`outputs/${SCALE}/sfa_top_postroute.def`), signoff netlist, and SDF timing files.

@@ -3,20 +3,24 @@
 ## 1. Overview
 This directory contains the **Non-Pipelined Combinational Baseline** of the Spatial Fission Model (corresponding to **Configuration A** in `evaluation_framework.md` / Planaria-style architecture).
 
-### Architectural Characteristics
+### Key Architectural Characteristics
 * **Spatial Multi-Tenancy (Fission):** A single physical PE array is dynamically partitioned into two independently operating regions (Region A and Region B) via dispatch-time column splitting (`cfg_split_col`).
 * **Hardware Boundary Isolation:** Inter-region horizontal forwarding wires are dynamically zeroed at column boundaries, preventing cross-tenant operand bleeding.
-* **Homogeneous Dataflow Constraint:** All partitioned regions are locked to the same global dataflow (**Weight-Stationary**).
-* **Shared Memory Substrate:** Memory banks are arbitrated via single-writer ownership tokens (**OTP**), 4-cycle zeroing scrub controllers, and phase-pinned bandwidth arbiters (**EPPA**).
-* **Single-Cycle Combinational MAC Baseline:** Implements direct single-cycle multiplication and accumulation, serving as the architectural baseline to quantify the timing closure and maximum frequency limits of unpipelined fission arrays.
+* **Homogeneous Dataflow Constraint:** All partitioned regions are locked to the same global dataflow (**Weight-Stationary**). This captures the fundamental limitation of prior spatial multi-tenant accelerators.
+* **32-Bit Vertical Partial-Sum Mesh:** Vertical ports (`din_n` / `dout_s`) are widened to 32 bits (`ACC_W = 32`), providing bit-for-bit mathematical parity with the pipelined model without accumulator overflow.
+* **Single-Cycle Combinational MAC Baseline:** Implements direct single-cycle multiplication and accumulation, serving as the architectural timing, power, and area baseline to quantify the performance and clock frequency gains offered by the pipelined carry-save accumulator (CSA) design.
+* **Shared Memory Substrate:** Memory banks are arbitrated via:
+  - Single-writer ownership token protocol (**OTP**) with rotating epoch priority.
+  - Mandatory **4-cycle hardware zeroing scrub controller** before bank role migration.
+  - Event-driven phase-pinned memory bandwidth arbiter (**EPPA**).
 
 ---
 
-## 2. Directory Structure & Partitioned Scaling Layout
+## 2. Directory Structure & Layout
 ```
 models/non_pipelined/spatial_fission/
 ├── rtl/
-│   ├── sfa_pe.sv              # Processing element pinned to Weight-Stationary (combinational MAC)
+│   ├── sfa_pe.sv              # Processing element pinned to Weight-Stationary (combinational MAC, 32-bit psum)
 │   ├── sfa_fission_decoder.sv # Dynamic column split decoder
 │   ├── sfa_array.sv           # 2D systolic array with hardware boundary isolation
 │   ├── sfa_otp_fsm.sv         # Single-writer ownership token FSM
@@ -24,7 +28,7 @@ models/non_pipelined/spatial_fission/
 │   ├── sfa_eppa.sv            # Event-driven phase-pinned bandwidth arbiter
 │   └── sfa_top.sv             # Top-level multi-tenant pod (4x4 baseline)
 ├── tb/
-│   └── sfa_top_tb.sv          # Standalone SystemVerilog testbench
+│   └── sfa_top_tb.sv          # Standalone SystemVerilog testbench (exhaustive 16 PEs)
 ├── reports/                   # Cadence Genus & Innovus synthesis/PnR reports
 │   ├── 4x4/                   # 4x4 baseline reports (timing, area, power, qor, gates)
 │   ├── 8x8/                   # 8x8 scaled pod reports
@@ -57,10 +61,17 @@ models/non_pipelined/spatial_fission/
 
 ## 3. Verification & Simulation
 
+### Testbench Architecture
+The standalone testbench (`tb/sfa_top_tb.sv`) validates dynamic spatial fission and shared resource arbitration with **exhaustive 16-PE assertion coverage**:
+1. **Dynamic Column Partitioning:** Confirms split decoding and boundary isolation mask (`region_id_mask`).
+2. **Concurrent Multi-Tenant WS Execution:** Co-executes distinct matrix workloads in Region A and Region B simultaneously, verifying mathematical correctness across **100% of all 16 PEs** with combinational MACs.
+3. **EPPA Memory Bandwidth Arbitration:** Dynamically arbitrates memory bandwidth across regions based on phase indicators (`BURST` vs `STREAM`).
+4. **Memory Scrubbing & Handshakes:** Exercises the 4-cycle hardware scrub state machine and `bank_role_clear` ownership transfers.
+
 ### Simulation Commands
 ```bash
 # Fast Icarus Verilog simulation:
-make test-4x4       # Run 4x4 baseline simulation (output in output/4x4/)
+make test-4x4       # Run 4x4 baseline simulation verifying all 16 PEs (output in output/4x4/)
 make iverilog       # Alias to test-4x4
 
 # Cadence Xcelium simulation:
@@ -77,12 +88,16 @@ make clean          # Clean temporary sandbox files without deleting tracked rep
 
 ---
 
-## 4. ASIC Logic Synthesis & Physical Design (90nm)
+## 4. ASIC Logic Synthesis (Cadence Genus @ 200 MHz)
 
 ```bash
-# Cadence Genus logic synthesis:
-make synth-4x4          # Synthesize 4x4 netlist and reports (reports/4x4/, netlist/4x4/)
+make synth-4x4      # Synthesize 4x4 netlist and reports (reports/4x4/, netlist/4x4/)
+```
 
-# Cadence Innovus physical design:
-make pnr-place-4x4      # Complete PnR flow for 4x4 (outputs in outputs/4x4/, db/4x4/)
+---
+
+## 5. Physical Design & Implementation (Cadence Innovus)
+
+```bash
+make pnr-place-4x4  # Complete PnR flow for 4x4 (outputs in outputs/4x4/, db/4x4/)
 ```

@@ -5,6 +5,7 @@
 *.dat
 *.info
 obj_dir/
+
 # Cadence simulation & synthesis artifacts
 output/*
 !output/
@@ -31,6 +32,12 @@ dump.vcd
 tb/dumps/
 scratch/
 a.out
+
+# Python build artifacts and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
 
 # Local reference and working files
 local/
